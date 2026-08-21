@@ -295,21 +295,90 @@ button{cursor:pointer}
   font-size:11px;font-weight:700;
 }
 .btn-small:hover{background:#f8fafc}
-.visor-paginas{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:13px;
-  max-height:620px;overflow:auto;padding:5px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;
+ .visor-paginas{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  gap:18px;
+  max-height:820px;
+  overflow:auto;
+  padding:10px;
+  background:#f1f5f9;
+  border:1px solid var(--line);
+  border-radius:12px;
 }
-.pagina-card{position:relative;background:#fff;border:2px solid var(--line);border-radius:8px;padding:7px;cursor:pointer}
-.pagina-card:hover{border-color:#aebdcc}
-.pagina-card.seleccionada{border-color:var(--blue);box-shadow:0 0 0 2px rgba(23,105,210,.10)}
-.pagina-card.no-seleccionada{opacity:.58}
-.pagina-card canvas{display:block;width:100%;height:auto;background:#fff;border:1px solid #e8edf2}
-.pagina-meta{display:flex;justify-content:space-between;gap:7px;margin-top:7px;font-size:10.5px}
-.pagina-numero{font-weight:800}
-.pagina-estado{color:var(--blue);font-weight:800}
-.pagina-card.no-seleccionada .pagina-estado{color:#64748b}
-.pagina-check{position:absolute;top:10px;right:10px;width:20px;height:20px;accent-color:var(--blue)}
-.visor-cargando{grid-column:1/-1;padding:25px;text-align:center;color:var(--muted);font-size:12px}
+.pagina-card{
+  position:relative;
+  background:#fff;
+  border:3px solid var(--line);
+  border-radius:12px;
+  padding:10px;
+  cursor:pointer;
+  min-width:0;
+  transition:.15s ease;
+}
+.pagina-card:hover{border-color:#94a3b8;transform:translateY(-1px)}
+.pagina-card.seleccionada{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(23,105,210,.12);
+}
+.pagina-card.no-seleccionada{
+  opacity:.72;
+  border-color:#cbd5e1;
+  background:#f8fafc;
+}
+.pagina-card canvas{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:650px;
+  object-fit:contain;
+  background:#fff;
+  border:1px solid #dbe3ec;
+  border-radius:6px;
+}
+.pagina-meta{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-top:10px;
+  padding:8px 4px 2px;
+  font-size:12px;
+}
+.pagina-numero{font-weight:800;color:#172033}
+.pagina-estado{
+  color:#fff;
+  background:#1769d2;
+  font-weight:900;
+  font-size:11px;
+  padding:6px 9px;
+  border-radius:999px;
+  text-transform:uppercase;
+  letter-spacing:.2px;
+}
+.pagina-card.no-seleccionada .pagina-estado{color:#fff;background:#64748b}
+.pagina-check{
+  position:absolute;
+  top:16px;
+  right:16px;
+  width:28px;
+  height:28px;
+  accent-color:var(--blue);
+  z-index:2;
+  cursor:pointer;
+}
+.pagina-estado::before{content:"✓ ";font-weight:900}
+.pagina-card.no-seleccionada .pagina-estado::before{content:"✕ "}
+.visor-cargando{
+  grid-column:1/-1;
+  padding:35px;
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+}
+@media (max-width:800px){
+  .visor-paginas{grid-template-columns:1fr;max-height:760px}
+}
 
 .actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:18px}
 .btn-green{border:0;background:var(--green);color:#fff;border-radius:8px;padding:11px 17px;font-size:12px;font-weight:800}
@@ -963,7 +1032,8 @@ async function cargarVisorPaginas(file) {
     for (let numero=1; numero<=totalPaginas; numero++) {
       const pagina = await pdfVista.getPage(numero);
       const baseViewport = pagina.getViewport({scale:1});
-      const escala = 138 / baseViewport.width;
+      // Miniatura grande para revisar el contenido antes de decidir qué página firmar.
+      const escala = Math.min(340 / baseViewport.width, 1.15);
       const viewport = pagina.getViewport({scale:escala});
 
       const card = document.createElement("div");
@@ -983,13 +1053,13 @@ async function cargarVisorPaginas(file) {
 
       const estadoEl = document.createElement("span");
       estadoEl.className = "pagina-estado";
-      estadoEl.textContent = "Certificar";
+      estadoEl.textContent = "SE FIRMARÁ";
 
       const check = document.createElement("input");
       check.type = "checkbox";
       check.className = "pagina-check";
       check.checked = true;
-      check.setAttribute("aria-label", `Certificar página ${numero}`);
+      check.setAttribute("aria-label", `Firmar página ${numero}`);
 
       meta.append(numeroEl, estadoEl);
       card.append(canvas, meta, check);
@@ -1011,7 +1081,7 @@ async function cargarVisorPaginas(file) {
           paginasSeleccionadas.delete(numero);
           card.classList.remove("seleccionada");
           card.classList.add("no-seleccionada");
-          estadoEl.textContent = "No certificar";
+          estadoEl.textContent = "NO SE FIRMARÁ";
         }
         actualizarResumenPaginas();
       };
