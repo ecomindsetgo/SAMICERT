@@ -295,90 +295,57 @@ button{cursor:pointer}
   font-size:11px;font-weight:700;
 }
 .btn-small:hover{background:#f8fafc}
- .visor-paginas{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
-  gap:18px;
-  max-height:820px;
-  overflow:auto;
-  padding:10px;
-  background:#f1f5f9;
-  border:1px solid var(--line);
-  border-radius:12px;
+.visor-paginas{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:13px;
+  max-height:620px;overflow:auto;padding:5px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;
 }
-.pagina-card{
-  position:relative;
-  background:#fff;
-  border:3px solid var(--line);
-  border-radius:12px;
-  padding:10px;
-  cursor:pointer;
-  min-width:0;
-  transition:.15s ease;
+.pagina-card{position:relative;background:#fff;border:2px solid var(--line);border-radius:8px;padding:7px;cursor:pointer}
+.pagina-card:hover{border-color:#aebdcc}
+.pagina-card.seleccionada{border-color:var(--blue);box-shadow:0 0 0 2px rgba(23,105,210,.10)}
+.pagina-card.no-seleccionada{opacity:.58}
+.pagina-card canvas{display:block;width:100%;height:auto;background:#fff;border:1px solid #e8edf2}
+.pagina-meta{display:flex;justify-content:space-between;gap:7px;margin-top:7px;font-size:10.5px}
+.pagina-numero{font-weight:800}
+.pagina-estado{color:var(--blue);font-weight:800}
+.pagina-card.no-seleccionada .pagina-estado{color:#64748b}
+.pagina-check{position:absolute;top:10px;right:10px;width:20px;height:20px;accent-color:var(--blue)}
+.visor-cargando{grid-column:1/-1;padding:25px;text-align:center;color:var(--muted);font-size:12px}
+
+
+/* Visor ampliado: no modifica la vista normal de páginas */
+.visor-lupa{
+  position:absolute;left:10px;top:10px;width:30px;height:30px;
+  border:1px solid #d5dde7;background:#fff;color:#1769d2;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;cursor:zoom-in;
+  font-size:16px;box-shadow:0 2px 6px rgba(15,23,42,.12);z-index:3;
 }
-.pagina-card:hover{border-color:#94a3b8;transform:translateY(-1px)}
-.pagina-card.seleccionada{
-  border-color:var(--blue);
-  box-shadow:0 0 0 3px rgba(23,105,210,.12);
+.visor-lupa:hover{background:#f1f6ff;border-color:#1769d2;transform:scale(1.05)}
+.visor-modal{
+  position:fixed;inset:0;background:rgba(15,23,42,.82);z-index:9999;
+  display:flex;flex-direction:column;padding:18px;
 }
-.pagina-card.no-seleccionada{
-  opacity:.72;
-  border-color:#cbd5e1;
-  background:#f8fafc;
+.visor-modal.oculto{display:none}
+.visor-modal-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  color:#fff;margin-bottom:12px;flex-wrap:wrap;
 }
-.pagina-card canvas{
-  display:block;
-  width:100%;
-  height:auto;
-  max-height:650px;
-  object-fit:contain;
-  background:#fff;
-  border:1px solid #dbe3ec;
-  border-radius:6px;
+.visor-modal-titulo{font-size:14px;font-weight:800}
+.visor-modal-controles{display:flex;gap:7px;align-items:center}
+.visor-modal-btn{
+  border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);
+  color:#fff;border-radius:7px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer;
 }
-.pagina-meta{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  margin-top:10px;
-  padding:8px 4px 2px;
-  font-size:12px;
+.visor-modal-btn:hover{background:rgba(255,255,255,.22)}
+.visor-modal-cerrar{font-size:18px;padding:5px 11px}
+.visor-modal-area{
+  flex:1;overflow:auto;background:#cbd5e1;border-radius:10px;
+  display:flex;align-items:flex-start;justify-content:center;padding:25px;
 }
-.pagina-numero{font-weight:800;color:#172033}
-.pagina-estado{
-  color:#fff;
-  background:#1769d2;
-  font-weight:900;
-  font-size:11px;
-  padding:6px 9px;
-  border-radius:999px;
-  text-transform:uppercase;
-  letter-spacing:.2px;
+#visorModalCanvas{
+  display:block;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.28);
+  transform-origin:top center;
 }
-.pagina-card.no-seleccionada .pagina-estado{color:#fff;background:#64748b}
-.pagina-check{
-  position:absolute;
-  top:16px;
-  right:16px;
-  width:28px;
-  height:28px;
-  accent-color:var(--blue);
-  z-index:2;
-  cursor:pointer;
-}
-.pagina-estado::before{content:"✓ ";font-weight:900}
-.pagina-card.no-seleccionada .pagina-estado::before{content:"✕ "}
-.visor-cargando{
-  grid-column:1/-1;
-  padding:35px;
-  text-align:center;
-  color:var(--muted);
-  font-size:13px;
-}
-@media (max-width:800px){
-  .visor-paginas{grid-template-columns:1fr;max-height:760px}
-}
+.visor-modal-ayuda{font-size:10.5px;color:#cbd5e1;text-align:center;margin-top:8px}
 
 .actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:18px}
 .btn-green{border:0;background:var(--green);color:#fff;border-radius:8px;padding:11px 17px;font-size:12px;font-weight:800}
@@ -611,7 +578,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
             <div class="selector-cabecera">
               <div>
                 <div class="selector-titulo">Páginas a certificar</div>
-                <div class="selector-subtitulo" id="resumenPaginas">Selecciona las páginas que deseas sellar.</div>
+                <div class="selector-subtitulo" id="resumenPaginas">Selecciona las páginas que deseas sellar. Usa la 🔍 de cada página para verla ampliada sin cambiar esta vista.</div>
               </div>
               <div class="selector-acciones">
                 <button type="button" class="btn-small" id="btnTodas">Todas</button>
@@ -620,6 +587,24 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
               </div>
             </div>
             <div id="visorPaginas" class="visor-paginas"></div>
+          </div>
+
+          <!-- Lupa para revisar una página en tamaño ampliado sin cambiar el visor normal -->
+          <div id="visorModal" class="visor-modal oculto" role="dialog" aria-modal="true" aria-label="Vista ampliada de página">
+            <div class="visor-modal-bar">
+              <div class="visor-modal-titulo" id="visorModalTitulo">Página</div>
+              <div class="visor-modal-controles">
+                <button type="button" class="visor-modal-btn" id="btnZoomMenos">−</button>
+                <span class="visor-modal-btn" id="visorZoomTexto">100%</span>
+                <button type="button" class="visor-modal-btn" id="btnZoomMas">+</button>
+                <button type="button" class="visor-modal-btn" id="btnZoomAjustar">Ajustar</button>
+                <button type="button" class="visor-modal-btn visor-modal-cerrar" id="btnCerrarVisorModal" aria-label="Cerrar">✕</button>
+              </div>
+            </div>
+            <div class="visor-modal-area" id="visorModalArea">
+              <canvas id="visorModalCanvas"></canvas>
+            </div>
+            <div class="visor-modal-ayuda">Use +/− para ampliar. También puede desplazarse por el documento con las barras de desplazamiento.</div>
           </div>
 
           <div class="fixed-config">
@@ -1032,13 +1017,23 @@ async function cargarVisorPaginas(file) {
     for (let numero=1; numero<=totalPaginas; numero++) {
       const pagina = await pdfVista.getPage(numero);
       const baseViewport = pagina.getViewport({scale:1});
-      // Miniatura grande para revisar el contenido antes de decidir qué página firmar.
-      const escala = Math.min(340 / baseViewport.width, 1.15);
+      const escala = 138 / baseViewport.width;
       const viewport = pagina.getViewport({scale:escala});
 
       const card = document.createElement("div");
       card.className = "pagina-card seleccionada";
       card.dataset.page = String(numero);
+
+      const lupa = document.createElement("button");
+      lupa.type = "button";
+      lupa.className = "visor-lupa";
+      lupa.innerHTML = "🔍";
+      lupa.title = "Ver página ampliada";
+      lupa.setAttribute("aria-label", `Ampliar página ${numero}`);
+      lupa.addEventListener("click", e => {
+        e.stopPropagation();
+        abrirVistaAmpliada(numero);
+      });
 
       const canvas = document.createElement("canvas");
       canvas.width = Math.ceil(viewport.width);
@@ -1053,16 +1048,16 @@ async function cargarVisorPaginas(file) {
 
       const estadoEl = document.createElement("span");
       estadoEl.className = "pagina-estado";
-      estadoEl.textContent = "SE FIRMARÁ";
+      estadoEl.textContent = "Certificar";
 
       const check = document.createElement("input");
       check.type = "checkbox";
       check.className = "pagina-check";
       check.checked = true;
-      check.setAttribute("aria-label", `Firmar página ${numero}`);
+      check.setAttribute("aria-label", `Certificar página ${numero}`);
 
       meta.append(numeroEl, estadoEl);
-      card.append(canvas, meta, check);
+      card.append(lupa, canvas, meta, check);
       visor.appendChild(card);
 
       await pagina.render({
@@ -1081,7 +1076,7 @@ async function cargarVisorPaginas(file) {
           paginasSeleccionadas.delete(numero);
           card.classList.remove("seleccionada");
           card.classList.add("no-seleccionada");
-          estadoEl.textContent = "NO SE FIRMARÁ";
+          estadoEl.textContent = "No certificar";
         }
         actualizarResumenPaginas();
       };
@@ -1106,7 +1101,87 @@ async function cargarVisorPaginas(file) {
   }
 }
 
+
+let visorModalPaginaActual = null;
+let visorModalZoom = 1;
+
+async function abrirVistaAmpliada(numero) {
+  if (!pdfVista) return;
+  try {
+    visorModalPaginaActual = numero;
+    const pagina = await pdfVista.getPage(numero);
+    const baseViewport = pagina.getViewport({scale:1});
+    const area = $("visorModalArea");
+    const canvas = $("visorModalCanvas");
+    const anchoDisponible = Math.max(350, area.clientWidth - 70);
+    // Al abrir, la página se ajusta al ancho disponible; luego el usuario puede ampliar.
+    visorModalZoom = Math.max(0.8, Math.min(1.5, anchoDisponible / baseViewport.width));
+    await renderPaginaModal(pagina);
+    $("visorModalTitulo").textContent = `Página ${numero} — vista ampliada`;
+    $("visorModal").classList.remove("oculto");
+    document.body.style.overflow = "hidden";
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function renderPaginaModal(pagina) {
+  const canvas = $("visorModalCanvas");
+  const escala = visorModalZoom;
+  const viewport = pagina.getViewport({scale:escala});
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  canvas.style.width = `${Math.ceil(viewport.width)}px`;
+  canvas.style.height = `${Math.ceil(viewport.height)}px`;
+  $("visorZoomTexto").textContent = `${Math.round(escala * 100)}%`;
+  await pagina.render({
+    canvasContext: canvas.getContext("2d"),
+    viewport
+  }).promise;
+}
+
+async function cambiarZoomModal(delta) {
+  if (!pdfVista || !visorModalPaginaActual) return;
+  const nuevo = Math.max(0.5, Math.min(3.5, visorModalZoom + delta));
+  if (Math.abs(nuevo - visorModalZoom) < 0.001) return;
+  visorModalZoom = nuevo;
+  const pagina = await pdfVista.getPage(visorModalPaginaActual);
+  await renderPaginaModal(pagina);
+}
+
+async function ajustarZoomModal() {
+  if (!pdfVista || !visorModalPaginaActual) return;
+  const pagina = await pdfVista.getPage(visorModalPaginaActual);
+  const baseViewport = pagina.getViewport({scale:1});
+  const area = $("visorModalArea");
+  visorModalZoom = Math.max(0.8, Math.min(1.5, (area.clientWidth - 70) / baseViewport.width));
+  await renderPaginaModal(pagina);
+}
+
+function cerrarVistaAmpliada() {
+  $("visorModal").classList.add("oculto");
+  visorModalPaginaActual = null;
+  document.body.style.overflow = "";
+}
+
+$("btnZoomMas").addEventListener("click", () => cambiarZoomModal(0.25));
+$("btnZoomMenos").addEventListener("click", () => cambiarZoomModal(-0.25));
+$("btnZoomAjustar").addEventListener("click", ajustarZoomModal);
+$("btnCerrarVisorModal").addEventListener("click", cerrarVistaAmpliada);
+
+$("visorModal").addEventListener("click", e => {
+  if (e.target === $("visorModal")) cerrarVistaAmpliada();
+});
+
+document.addEventListener("keydown", e => {
+  if ($("visorModal").classList.contains("oculto")) return;
+  if (e.key === "Escape") cerrarVistaAmpliada();
+  if (e.key === "+" || e.key === "=") cambiarZoomModal(0.25);
+  if (e.key === "-") cambiarZoomModal(-0.25);
+});
+
 function resetearEstadoSesion() {
+  cerrarVistaAmpliada();
   // Limpia por completo el documento que pudiera haber quedado en memoria
   // para que el siguiente usuario nunca herede archivos ni páginas del anterior.
   if (resultadoBlob) {
