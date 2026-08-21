@@ -3,6 +3,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Reemplace este UID por el UID real de la cuenta administradora
+    // creada en Firebase Authentication.
+    function esAdministrador() {
+      return request.auth != null &&
+        request.auth.uid == "OCsKdrDfB6h0Ey5RLjiWnvoOWqs1";
+    }
+
     function esCertificador() {
       return request.auth != null &&
         (
@@ -12,16 +19,30 @@ service cloud.firestore {
     }
 
     match /usuarios/{uid} {
-      allow read: if esCertificador();
-      allow create, update: if esCertificador() && request.auth.uid == uid;
+      allow read: if esAdministrador() || (esCertificador() && request.auth.uid == uid);
+
+      allow create: if
+        (esAdministrador() && request.auth.uid == uid) ||
+        (esCertificador() && request.auth.uid == uid);
+
+      allow update: if
+        (esAdministrador() && request.auth.uid == uid) ||
+        (esCertificador() && request.auth.uid == uid);
+
       allow delete: if false;
     }
 
     match /certificaciones/{certificacionId} {
-      allow read: if esCertificador();
+      allow read: if esAdministrador() || esCertificador();
+
       allow create: if esCertificador()
         && request.resource.data.certificadorUid == request.auth.uid;
-      allow update, delete: if false;
+
+      // Solo el administrador puede eliminar registros.
+      // No se permite editar certificaciones, ni siquiera al administrador,
+      // para conservar la trazabilidad del registro original.
+      allow update: if false;
+      allow delete: if esAdministrador();
     }
 
     match /{document=**} {

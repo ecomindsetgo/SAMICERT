@@ -128,6 +128,34 @@ button{cursor:pointer}
   font-weight:700;
 }
 .btn-password:hover{background:rgba(255,255,255,.15)}
+
+/* ADMINISTRACIÓN */
+.admin-danger{color:var(--danger)}
+.admin-note{
+  margin-top:12px;padding:12px 14px;background:#fffaf0;border:1px solid #f1dda8;
+  border-radius:8px;color:#6b5a1a;font-size:12px;line-height:1.5;
+}
+.admin-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.admin-status{font-size:12px;color:var(--muted);margin-left:auto}
+.admin-table{width:100%;border-collapse:collapse;font-size:12px}
+.admin-table th,.admin-table td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.admin-table th{font-size:11px;color:#64748b;text-transform:uppercase;background:#f8fafc}
+.admin-table input[type="checkbox"]{width:17px;height:17px}
+.btn-danger{
+  border:0;background:var(--danger);color:#fff;border-radius:8px;padding:10px 14px;
+  font-size:12px;font-weight:800;
+}
+.btn-danger:disabled{opacity:.5;cursor:not-allowed}
+.btn-outline-danger{
+  border:1px solid #e1aaa4;background:#fff;color:var(--danger);border-radius:8px;padding:9px 12px;
+  font-size:11px;font-weight:800;
+}
+.backup-card{
+  background:#f6fbf8;border:1px solid #cfe5d6;border-radius:10px;padding:15px;
+  line-height:1.5;font-size:12px;
+}
+.admin-stat{font-size:28px;font-weight:900;color:var(--navy);margin-top:4px}
+
 @media(max-width:900px){
   .topbar{align-items:flex-start;flex-wrap:wrap}
   .user-area{min-width:0;flex-wrap:wrap}
@@ -407,10 +435,12 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
       <button class="nav-btn" data-page="historial"><span class="nav-icon">☷</span>Historial de Certificaciones</button>
       <button class="nav-btn" data-page="acerca"><span class="nav-icon">ⓘ</span>Acerca de SAMICERT</button>
       <button class="nav-btn" data-page="seguridad"><span class="nav-icon">🔒</span>Seguridad / Contraseña</button>
+      <button class="nav-btn oculto" id="navAdministracion" data-page="administracion"><span class="nav-icon">⚙</span>Administración</button>
     </nav>
 
     <div class="sidebar-footer">
-      SAMICERT v1.0.0<br>
+      SAMICERT v2.0.0<br>
+      Creado por Alfredo Raúl Cruzado Palacios<br>
       © 2026 Poder Judicial del Perú
     </div>
   </aside>
@@ -597,6 +627,51 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
       </section>
 
       <!-- ACERCA -->
+      <!-- ADMINISTRACIÓN -->
+      <section class="page" id="page-administracion">
+        <div class="section-head">
+          <h2>Administración de SAMICERT</h2>
+          <p>Funciones reservadas exclusivamente al usuario administrador.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Respaldo de registros</div>
+          <div class="panel-subtitle">
+            Genera un respaldo JSON de las certificaciones registradas en Firestore. Incluye metadatos, SHA-256,
+            certificador, fecha, hora y páginas certificadas.
+          </div>
+          <div class="backup-card">
+            <strong>Importante:</strong> la versión actual de SAMICERT no almacena los PDF certificados dentro de Firebase;
+            los archivos se descargan en el equipo del certificador. Por ello, este respaldo protege el registro de certificaciones,
+            no los archivos PDF.
+          </div>
+          <div class="admin-toolbar">
+            <button class="btn-green" id="btnCrearBackup">Generar respaldo</button>
+            <span class="admin-status" id="backupStatus"></span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title admin-danger">Limpieza de datos de prueba</div>
+          <div class="panel-subtitle">
+            Seleccione registros que correspondan a pruebas o errores y elimínelos. Esta operación es irreversible desde la aplicación.
+          </div>
+          <div class="admin-note">
+            <strong>Recomendación:</strong> genere un respaldo antes de eliminar información.
+            Las reglas de Firebase impiden que los certificadores eliminen registros.
+          </div>
+          <div class="admin-toolbar">
+            <button class="btn-small" id="btnSeleccionarTodosAdmin">Seleccionar todos</button>
+            <button class="btn-small" id="btnDeseleccionarTodosAdmin">Deseleccionar todos</button>
+            <button class="btn-danger" id="btnEliminarSeleccionados" disabled>Eliminar seleccionados</button>
+            <span class="admin-status" id="adminStatus"></span>
+          </div>
+          <div id="adminLista" class="history-list">
+            <div class="empty">Cargando registros…</div>
+          </div>
+        </div>
+      </section>
+
       <!-- SEGURIDAD -->
       <section class="page" id="page-seguridad">
         <div class="section-head">
@@ -675,12 +750,17 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
               <h3>Seguridad</h3>
               <p>El acceso requiere autenticación. Las certificaciones registradas están protegidas para impedir modificaciones o eliminaciones desde la aplicación.</p>
             </div>
+            <div class="about-box">
+              <h3>Autor del sistema</h3>
+              <p><strong>Alfredo Raúl Cruzado Palacios</strong><br>Diseño y desarrollo de SAMICERT.</p>
+            </div>
           </div>
         </div>
       </section>
 
       <footer>
         <strong>SAMICERT</strong> · Sistema de Archivo y Manejo de Información para la Certificación de Documentos<br>
+        Creado por <strong>Alfredo Raúl Cruzado Palacios</strong><br>
         Poder Judicial del Perú · Archivo Desconcentrado · Corte Superior de Justicia del Santa
       </footer>
     </div>
@@ -694,9 +774,9 @@ import {
   EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, query, collection, where, limit, getDocs, serverTimestamp
+  getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, limit, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
+import { firebaseConfig, ADMIN_UID } from "./firebase-config.js";
 
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
@@ -734,6 +814,7 @@ let selloBytes = null;
 const TAMANO_SELLO_PT = 90;
 const MARGEN_SELLO_PT = 3;
 const ESQUINA_SELLO = "inferior-derecha";
+let esAdministradorActual = false;
 
 const USUARIOS_AUTORIZADOS = {
   "wBCSJ3XfHVaUZPLmC2yJddh5RXx1": {
@@ -968,6 +1049,8 @@ function resetearEstadoSesion() {
   pdfVista = null;
   selloBytes = null;
   perfilActual = null;
+  esAdministradorActual = false;
+  actualizarAccesoAdministrador();
 
   const inputVerificar = $("inputVerificarPdf");
   if (inputVerificar) inputVerificar.value = "";
@@ -1417,6 +1500,148 @@ async function cargarHistorial() {
   }
 }
 
+
+function actualizarAccesoAdministrador() {
+  esAdministradorActual = !!usuarioActual && usuarioActual.uid === ADMIN_UID;
+  const navAdmin = $("navAdministracion");
+  if (navAdmin) navAdmin.classList.toggle("oculto", !esAdministradorActual);
+}
+
+function formatoFechaRegistro(r) {
+  if (r.creadoEn?.seconds) {
+    return new Intl.DateTimeFormat("es-PE", {
+      timeZone:"America/Lima", dateStyle:"short", timeStyle:"medium"
+    }).format(new Date(r.creadoEn.seconds * 1000));
+  }
+  return `${r.fecha || ""} ${r.hora || ""}`.trim();
+}
+
+async function cargarAdministracion() {
+  if (!esAdministradorActual) return;
+  const contenedor = $("adminLista");
+  const estado = $("adminStatus");
+  contenedor.innerHTML = '<div class="empty">Cargando registros…</div>';
+  estado.textContent = "";
+
+  try {
+    const snap = await getDocs(collection(db,"certificaciones"));
+    const registros = snap.docs.map(d => ({...d.data(), id:d.id}))
+      .sort((a,b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0));
+
+    if (!registros.length) {
+      contenedor.innerHTML = '<div class="empty">No hay certificaciones registradas.</div>';
+      actualizarBotonEliminarAdmin();
+      return;
+    }
+
+    contenedor.innerHTML = `
+      <div style="overflow:auto">
+        <table class="admin-table">
+          <thead><tr>
+            <th></th><th>ID</th><th>Archivo</th><th>Fecha</th><th>Certificador</th>
+          </tr></thead>
+          <tbody>
+            ${registros.map(r => `
+              <tr>
+                <td><input class="admin-check" type="checkbox" value="${escapeHtml(r.id)}"></td>
+                <td><strong>${escapeHtml(r.id)}</strong></td>
+                <td>${escapeHtml(r.archivoOriginal || "Documento PDF")}<br>
+                    <span style="color:#64748b">${escapeHtml((r.paginasCertificadas || []).length)} página(s)</span></td>
+                <td>${escapeHtml(formatoFechaRegistro(r))}</td>
+                <td>${escapeHtml(r.certificadorNombre || r.certificadorEmail || "")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    contenedor.querySelectorAll(".admin-check").forEach(c =>
+      c.addEventListener("change", actualizarBotonEliminarAdmin)
+    );
+    actualizarBotonEliminarAdmin();
+    estado.textContent = `${registros.length} registro(s)`;
+  } catch (err) {
+    console.error(err);
+    contenedor.innerHTML = `<div class="empty">No se pudo cargar la administración: ${escapeHtml(err.message || "")}</div>`;
+  }
+}
+
+function obtenerSeleccionAdmin() {
+  return [...document.querySelectorAll(".admin-check:checked")].map(c => c.value);
+}
+
+function actualizarBotonEliminarAdmin() {
+  const btn = $("btnEliminarSeleccionados");
+  if (btn) btn.disabled = !esAdministradorActual || obtenerSeleccionAdmin().length === 0;
+}
+
+function seleccionarTodosAdmin(valor) {
+  document.querySelectorAll(".admin-check").forEach(c => c.checked = valor);
+  actualizarBotonEliminarAdmin();
+}
+
+async function crearBackupAdmin() {
+  if (!esAdministradorActual) return;
+  const estado = $("backupStatus");
+  estado.textContent = "Generando respaldo…";
+
+  try {
+    const snap = await getDocs(collection(db,"certificaciones"));
+    const registros = snap.docs.map(d => ({...d.data(), id:d.id}));
+    const backup = {
+      sistema: "SAMICERT",
+      version: "2.0.0",
+      creadoPor: "Alfredo Raúl Cruzado Palacios",
+      tipo: "respaldo_registros_firestore",
+      generadoEn: new Date().toISOString(),
+      totalRegistros: registros.length,
+      registros
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {type:"application/json;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Intl.DateTimeFormat("sv-SE", {
+      timeZone:"America/Lima", year:"numeric", month:"2-digit", day:"2-digit",
+      hour:"2-digit", minute:"2-digit", second:"2-digit"
+    }).format(new Date()).replace(/[ :]/g,"-");
+    a.href = url;
+    a.download = `SAMICERT_BACKUP_${stamp}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    estado.textContent = `Respaldo generado: ${registros.length} registro(s).`;
+  } catch (err) {
+    console.error(err);
+    estado.textContent = `Error: ${err.message || "no se pudo generar el respaldo"}`;
+  }
+}
+
+async function eliminarSeleccionadosAdmin() {
+  if (!esAdministradorActual) return;
+  const ids = obtenerSeleccionAdmin();
+  if (!ids.length) return;
+
+  const confirmado = confirm(
+    `Está a punto de eliminar ${ids.length} registro(s) de certificación.\\n\\n` +
+    `Esta acción es irreversible desde SAMICERT. ¿Desea continuar?`
+  );
+  if (!confirmado) return;
+
+  const estado = $("adminStatus");
+  estado.textContent = "Eliminando…";
+  const btn = $("btnEliminarSeleccionados");
+  btn.disabled = true;
+
+  try {
+    for (const id of ids) await deleteDoc(doc(db,"certificaciones",id));
+    estado.textContent = `Se eliminaron ${ids.length} registro(s).`;
+    await cargarAdministracion();
+    await cargarHistorial();
+  } catch (err) {
+    console.error(err);
+    estado.textContent = `No se pudo completar la eliminación: ${err.message || ""}`;
+    await cargarAdministracion();
+  }
+}
+
 function mostrarPagina(nombre) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
@@ -1428,6 +1653,7 @@ function mostrarPagina(nombre) {
   if (nav) nav.classList.add("active");
 
   if (nombre === "historial") cargarHistorial();
+  if (nombre === "administracion") cargarAdministracion();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -1440,39 +1666,47 @@ document.querySelectorAll("[data-go]").forEach(btn => {
 });
 
 $("btnActualizarHistorial").addEventListener("click", cargarHistorial);
+$("btnCrearBackup").addEventListener("click", crearBackupAdmin);
+$("btnEliminarSeleccionados").addEventListener("click", eliminarSeleccionadosAdmin);
+$("btnSeleccionarTodosAdmin").addEventListener("click", () => seleccionarTodosAdmin(true));
+$("btnDeseleccionarTodosAdmin").addEventListener("click", () => seleccionarTodosAdmin(false));
 
 async function cargarPerfil(user) {
   const autorizado = USUARIOS_AUTORIZADOS[user.uid];
+  const esAdmin = user.uid === ADMIN_UID;
 
-  if (!autorizado || user.email?.toLowerCase() !== autorizado.correo.toLowerCase()) {
+  if (!autorizado && !esAdmin) {
     throw new Error("Esta cuenta no está autorizada para utilizar SAMICERT.");
+  }
+
+  if (autorizado && user.email?.toLowerCase() !== autorizado.correo.toLowerCase()) {
+    throw new Error("La cuenta no coincide con el certificador autorizado.");
   }
 
   const snap = await getDoc(doc(db,"usuarios",user.uid));
 
   if (!snap.exists()) {
-    await setDoc(doc(db,"usuarios",user.uid),{
+    const perfilNuevo = {
       uid:user.uid,
-      nombre:autorizado.nombre,
-      correo:autorizado.correo,
+      nombre:autorizado?.nombre || user.displayName || "Administrador",
+      correo:autorizado?.correo || user.email || "",
+      rol:esAdmin ? "administrador" : "certificador",
       creadoEn:serverTimestamp()
-    });
-    perfilActual = {
-      uid:user.uid,
-      nombre:autorizado.nombre,
-      correo:autorizado.correo
     };
+    await setDoc(doc(db,"usuarios",user.uid), perfilNuevo);
+    perfilActual = {...perfilNuevo, uid:user.uid};
   } else {
     perfilActual = {
       ...snap.data(),
       uid:user.uid,
-      nombre:autorizado.nombre,
-      correo:autorizado.correo
+      rol:esAdmin ? "administrador" : (snap.data().rol || "certificador")
     };
   }
 
-  $("usuarioNombre").textContent = autorizado.nombre;
-  $("usuarioEmail").textContent = autorizado.correo;
+  esAdministradorActual = esAdmin;
+  $("usuarioNombre").textContent = perfilActual.nombre || (esAdmin ? "Administrador" : "Usuario autorizado");
+  $("usuarioEmail").textContent = perfilActual.correo || user.email || "";
+  actualizarAccesoAdministrador();
 }
 
 function mostrarMensajePassword(tipo, mensaje) {
