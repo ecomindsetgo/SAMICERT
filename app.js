@@ -836,45 +836,166 @@ $("inputVerificarPdf").addEventListener("change",async e => {
   }
 });
 
+// --- Historial: estado en memoria (cache), filtros y paginación ---
+let historialRegistros = [];   // todos los registros tal como vienen de Firestore
+let historialFiltrados = [];   // resultado luego de aplicar los filtros activos
+let historialPaginaActual = 1;
+
+function fechaRegistroEnMs(r) {
+  if (r.creadoEn?.seconds) return r.creadoEn.seconds * 1000;
+  // Respaldo si el registro no trae "creadoEn": intenta usar el campo "fecha" (dd/mm/aaaa o similar)
+  const partes = (r.fecha || "").split(/[\/\-]/).map(Number);
+  if (partes.length === 3) {
+    const [a,b,c] = partes;
+    // Heurística simple: si el primer valor es > 31, es formato aaaa-mm-dd
+    const ms = a > 31 ? Date.UTC(a, b - 1, c) : Date.UTC(c, b - 1, a);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  return 0;
+}
+
 async function cargarHistorial() {
   const contenedor = $("historialLista");
   contenedor.innerHTML = '<div class="empty">Cargando historial…</div>';
+  $("historialPaginacion").classList.add("oculto");
 
   try {
     const snap = await getDocs(collection(db,"certificaciones"));
+    historialRegistros = snap.docs.map(d => ({...d.data(), id:d.id}));
 
-    const registros = snap.docs.map(d => ({...d.data(), id:d.id}));
+    historialRegistros.sort((a,b) => fechaRegistroEnMs(b) - fechaRegistroEnMs(a));
 
-    registros.sort((a,b) => {
-      const sa = a.creadoEn?.seconds || 0;
-      const sb = b.creadoEn?.seconds || 0;
-      return sb - sa;
-    });
-
-    if (!registros.length) {
-      contenedor.innerHTML = '<div class="empty">Aún no hay certificaciones registradas.</div>';
-      return;
-    }
-
-    contenedor.innerHTML = registros.map(r => `
-      <div class="history-item">
-        <div class="history-id">${escapeHtml(r.id)}</div>
-        <div>
-          <div class="history-file">${escapeHtml(r.archivoOriginal || "Documento PDF")}</div>
-          <div class="history-meta">${escapeHtml(r.fecha || "")} ${escapeHtml(r.hora || "")} · ${escapeHtml((r.paginasCertificadas || []).length)} página(s)</div>
-        </div>
-        <div class="history-cert">
-          <strong>${escapeHtml(r.certificadorNombre || "")}</strong><br>
-          <span>${escapeHtml(r.certificadorEmail || "")}</span>
-        </div>
-      </div>
-    `).join("");
+    poblarFiltroCertificadorHistorial();
+    historialPaginaActual = 1;
+    aplicarFiltrosHistorial();
   } catch(err) {
     console.error(err);
     contenedor.innerHTML =
       `<div class="empty">No se pudo cargar el historial: ${escapeHtml(err.message || "")}</div>`;
   }
 }
+
+// Llena el <select> de certificadores con los nombres realmente presentes en los registros,
+// sin depender de una lista fija (si en el futuro se agrega un tercer certificador, aparece solo).
+function poblarFiltroCertificadorHistorial() {
+  const select = $("histCertificador");
+  const valorPrevio = select.value;
+  const nombres = [...new Set(
+    historialRegistros
+      .map(r => r.certificadorNombre || r.certificadorEmail || "")
+      .filter(Boolean)
+  )].sort((a,b) => a.localeCompare(b));
+
+  select.innerHTML = '<option value="">Todos los certificadores</option>' +
+    nombres.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+
+  if (nombres.includes(valorPrevio)) select.value = valorPrevio;
+}
+
+// Aplica búsqueda de texto + certificador + rango de fechas sobre historialRegistros,
+// recalcula el total de folios certificados y vuelve a la página 1 del resultado filtrado.
+function aplicarFiltrosHistorial() {
+  const texto = ($("histBuscar").value || "").trim().toLowerCase();
+  const certificador = $("histCertificador").value;
+  const desde = $("histDesde").value ? new Date($("histDesde").value + "T00:00:00").getTime() : null;
+  const hasta = $("histHasta").value ? new Date($("histHasta").value + "T23:59:59").getTime() : null;
+
+  historialFiltrados = historialRegistros.filter(r => {
+    if (texto) {
+      const campo = `${r.archivoOriginal || ""} ${r.certificadorNombre || ""} ${r.certificadorEmail || ""} ${r.id || ""}`.toLowerCase();
+      if (!campo.includes(texto)) return false;
+    }
+    if (certificador && (r.certificadorNombre || r.certificadorEmail || "") !== certificador) return false;
+
+    const ms = fechaRegistroEnMs(r);
+    if (desde !== null && ms < desde) return false;
+    if (hasta !== null && ms > hasta) return false;
+
+    return true;
+  });
+
+  historialPaginaActual = 1;
+  renderHistorialPagina();
+}
+
+function totalFoliosDe(registros) {
+  return registros.reduce((suma, r) => suma + ((r.paginasCertificadas || []).length || 0), 0);
+}
+
+function renderHistorialPagina() {
+  const contenedor = $("historialLista");
+  const paginacion = $("historialPaginacion");
+  const porPagina = parseInt($("histPorPagina").value, 10) || 12;
+
+  $("histResumenConteo").textContent =
+    `${historialFiltrados.length} registro(s)` +
+    (historialFiltrados.length !== historialRegistros.length ? ` de ${historialRegistros.length} en total` : "");
+  $("histTotalFolios").textContent = totalFoliosDe(historialFiltrados);
+
+  if (!historialFiltrados.length) {
+    contenedor.innerHTML = historialRegistros.length
+      ? '<div class="empty">Ningún registro coincide con los filtros aplicados.</div>'
+      : '<div class="empty">Aún no hay certificaciones registradas.</div>';
+    paginacion.classList.add("oculto");
+    return;
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(historialFiltrados.length / porPagina));
+  if (historialPaginaActual > totalPaginas) historialPaginaActual = totalPaginas;
+  if (historialPaginaActual < 1) historialPaginaActual = 1;
+
+  const inicio = (historialPaginaActual - 1) * porPagina;
+  const registrosPagina = historialFiltrados.slice(inicio, inicio + porPagina);
+
+  contenedor.innerHTML = registrosPagina.map(r => `
+    <div class="history-item">
+      <div class="history-id">${escapeHtml(r.id)}</div>
+      <div>
+        <div class="history-file">${escapeHtml(r.archivoOriginal || "Documento PDF")}</div>
+        <div class="history-meta">${escapeHtml(r.fecha || "")} ${escapeHtml(r.hora || "")} · ${escapeHtml((r.paginasCertificadas || []).length)} página(s)</div>
+      </div>
+      <div class="history-cert">
+        <strong>${escapeHtml(r.certificadorNombre || "")}</strong><br>
+        <span>${escapeHtml(r.certificadorEmail || "")}</span>
+      </div>
+    </div>
+  `).join("");
+
+  paginacion.classList.toggle("oculto", totalPaginas <= 1);
+  $("histPaginaIndicador").textContent = `Página ${historialPaginaActual} de ${totalPaginas}`;
+  $("btnHistPaginaAnterior").disabled = historialPaginaActual <= 1;
+  $("btnHistPaginaSiguiente").disabled = historialPaginaActual >= totalPaginas;
+}
+
+function limpiarFiltrosHistorial() {
+  $("histBuscar").value = "";
+  $("histCertificador").value = "";
+  $("histDesde").value = "";
+  $("histHasta").value = "";
+  aplicarFiltrosHistorial();
+}
+
+let _histBuscarDebounce = null;
+$("histBuscar").addEventListener("input", () => {
+  clearTimeout(_histBuscarDebounce);
+  _histBuscarDebounce = setTimeout(aplicarFiltrosHistorial, 250);
+});
+$("histCertificador").addEventListener("change", aplicarFiltrosHistorial);
+$("histDesde").addEventListener("change", aplicarFiltrosHistorial);
+$("histHasta").addEventListener("change", aplicarFiltrosHistorial);
+$("btnLimpiarFiltrosHistorial").addEventListener("click", limpiarFiltrosHistorial);
+$("histPorPagina").addEventListener("change", () => {
+  historialPaginaActual = 1;
+  renderHistorialPagina();
+});
+$("btnHistPaginaAnterior").addEventListener("click", () => {
+  historialPaginaActual--;
+  renderHistorialPagina();
+});
+$("btnHistPaginaSiguiente").addEventListener("click", () => {
+  historialPaginaActual++;
+  renderHistorialPagina();
+});
 
 
 function actualizarAccesoAdministrador() {

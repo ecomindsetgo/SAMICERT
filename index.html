@@ -264,8 +264,41 @@
             <div class="panel-title" style="margin:0">Certificaciones registradas</div>
             <button class="btn-small" id="btnActualizarHistorial">Actualizar</button>
           </div>
+
+          <div class="history-filtros">
+            <input type="text" id="histBuscar" placeholder="Buscar por archivo, certificador o ID…">
+            <select id="histCertificador">
+              <option value="">Todos los certificadores</option>
+            </select>
+            <div class="history-filtro-fechas">
+              <label for="histDesde">Desde</label>
+              <input type="date" id="histDesde">
+              <label for="histHasta">Hasta</label>
+              <input type="date" id="histHasta">
+            </div>
+            <button type="button" class="btn-small" id="btnLimpiarFiltrosHistorial">Limpiar filtros</button>
+            <div class="history-porpagina">
+              <label for="histPorPagina">Por página</label>
+              <select id="histPorPagina">
+                <option value="12">12</option>
+                <option value="15">15</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="history-resumen">
+            <span id="histResumenConteo">0 registro(s)</span>
+            <span class="history-resumen-folios">Total de folios/páginas certificadas: <strong id="histTotalFolios">0</strong></span>
+          </div>
+
           <div id="historialLista" class="history-list">
             <div class="empty">Cargando historial…</div>
+          </div>
+
+          <div id="historialPaginacion" class="history-paginacion oculto">
+            <button type="button" class="btn-small" id="btnHistPaginaAnterior">‹ Anterior</button>
+            <span id="histPaginaIndicador">Página 1 de 1</span>
+            <button type="button" class="btn-small" id="btnHistPaginaSiguiente">Siguiente ›</button>
           </div>
         </div>
       </section>

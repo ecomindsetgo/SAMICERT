@@ -370,6 +370,36 @@ button{cursor:pointer}
 .verify-file-name{margin-top:10px;padding:10px 12px;border:1px solid var(--line);background:#f8fafc;border-radius:8px;font-size:12px;color:#334155;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .history-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+
+.history-filtros{
+  display:flex;flex-wrap:wrap;gap:9px;align-items:center;
+  padding:12px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;margin-bottom:12px;
+}
+.history-filtros input[type="text"],
+.history-filtros input[type="date"],
+.history-filtros select{
+  border:1px solid #d5dde7;border-radius:7px;padding:8px 10px;font-size:12px;color:var(--ink);background:#fff;
+}
+.history-filtros input[type="text"]:focus,
+.history-filtros input[type="date"]:focus,
+.history-filtros select:focus{border-color:var(--blue);outline:none}
+#histBuscar{flex:1;min-width:180px}
+.history-filtro-fechas{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.history-filtro-fechas input{width:135px}
+.history-porpagina{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+
+.history-resumen{
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+  font-size:11.5px;color:var(--muted);margin-bottom:12px;padding:0 2px;
+}
+.history-resumen-folios{font-size:12px;color:var(--ink)}
+.history-resumen-folios strong{color:var(--blue);font-size:14px}
+
+.history-paginacion{
+  display:flex;justify-content:center;align-items:center;gap:14px;margin-top:16px;
+}
+#histPaginaIndicador{font-size:11.5px;color:var(--muted);font-weight:700}
+
 .history-list{display:flex;flex-direction:column;gap:8px}
 .history-item{
   display:grid;grid-template-columns:155px 1fr auto;gap:14px;align-items:center;
@@ -408,4 +438,8 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .home-card{align-items:flex-start;flex-direction:column}
   .query-row{flex-direction:column;align-items:stretch}
   .history-item{grid-template-columns:1fr}.history-cert{text-align:left}
+  .history-filtros{flex-direction:column;align-items:stretch}
+  .history-filtro-fechas{flex-wrap:wrap}
+  #histBuscar{min-width:0}
+  .history-resumen{flex-direction:column;align-items:flex-start}
 }
