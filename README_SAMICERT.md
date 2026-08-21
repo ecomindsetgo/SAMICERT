@@ -50,14 +50,29 @@ La eliminación se ejecuta contra Firestore y es irreversible desde la aplicaci�
 El sistema calcula SHA-256 sobre los bytes exactos del PDF final después de aplicar el sello y registra la huella en Firestore.
 
 ## Archivos
-- `index.html` — aplicación web.
+- `index.html` — marcado de la aplicación (sin estilos ni lógica embebidos).
+- `style.css` — estilos de la interfaz.
+- `app.js` — lógica de la aplicación (Firebase, sellado con pdf-lib, visor con pdf.js, administración).
 - `firebase-config.js` — configuración Firebase y UID administrativo.
 - `firestore.rules` — seguridad de Firestore.
 - `sello-jorge.png` — sello del certificador Jorge.
 - `sello-roberto.png` — sello del certificador Roberto.
+
+No requiere build ni bundler: los cuatro archivos (`index.html`, `style.css`, `app.js`, `firebase-config.js`) deben publicarse juntos, en la misma carpeta, tal como están.
 
 
 ## Corrección v2.0.1
 Se corrigió un error de sintaxis en `firebase-config.js` que impedía cargar el módulo JavaScript de Firebase. El archivo contenía secuencias `\n` literales después del objeto de configuración. Esto hacía que la aplicación no pudiera inicializar Firebase y, por tanto, ningún usuario podía ingresar.
 
 La aplicación debe publicarse mediante un servidor web (por ejemplo Netlify), no abrirse directamente con `file://`.
+
+## Corrección v2.0.2
+- Se corrigió el mismo tipo de error de escape (`\n` literal en vez de salto de línea real) que afectó a `firebase-config.js` en v2.0.1, esta vez en el mensaje de confirmación de `index.html` al eliminar registros desde Administración.
+- Se configuró explícitamente `pdfjsLib.GlobalWorkerOptions.workerSrc`. Sin esto, el visor de páginas podía caer en un worker de un solo hilo, más lento e inestable con documentos de muchas páginas.
+- El visor de páginas ahora renderiza cada página de forma independiente: si una página individual está dañada o no se puede previsualizar, se muestra un aviso "Sin vista previa" en esa página en vez de cancelar la vista previa completa del documento. La página sigue pudiendo seleccionarse y certificarse igual (el sellado con pdf-lib no depende de la previsualización con pdf.js).
+- En documentos de varias páginas, el visor ahora muestra el avance de carga ("Cargando vista previa… (n de total)").
+- Se agregó manejo específico para PDF protegidos con contraseña/encriptados y para archivos corruptos al momento de certificar, con mensajes de error más claros.
+- No se impuso ningún límite de tamaño ni de número de páginas: el sistema está pensado para certificar documentos tanto de pocas páginas como de varios cientos.
+
+## División v2.0.2
+El `index.html` monolítico (marcado + estilos + lógica en un solo archivo de ~2000 líneas) se separó en tres archivos para facilitar el mantenimiento: `index.html` (marcado), `style.css` (estilos) y `app.js` (lógica). No cambia nada del comportamiento ni requiere build: siguen siendo archivos estáticos que se publican juntos tal cual.
