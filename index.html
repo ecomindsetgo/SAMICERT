@@ -74,6 +74,65 @@ button{cursor:pointer}
 .login-btn{width:100%;margin-top:4px}
 .login-error{margin-top:12px;padding:10px 12px;border-radius:8px;background:#fff3f1;border:1px solid #f1c5bf;color:var(--danger);font-size:12px}
 
+
+/* CAMBIO DE CONTRASEÑA */
+.password-panel{
+  max-width:620px;
+}
+.password-form{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.password-form .field{margin-bottom:0}
+.password-help{
+  margin:0 0 4px;
+  padding:11px 13px;
+  background:#f4f8ff;
+  border-left:4px solid var(--blue);
+  border-radius:8px;
+  color:#475569;
+  font-size:12px;
+  line-height:1.5;
+}
+.password-actions{
+  display:flex;
+  gap:9px;
+  flex-wrap:wrap;
+  margin-top:4px;
+}
+.password-message{
+  margin-top:12px;
+  padding:10px 12px;
+  border-radius:8px;
+  font-size:12px;
+  line-height:1.45;
+}
+.password-message.success{
+  background:#eaf7ee;
+  border:1px solid #b9dfc5;
+  color:#176b35;
+}
+.password-message.error{
+  background:#fff3f1;
+  border:1px solid #f1c5bf;
+  color:var(--danger);
+}
+.btn-password{
+  border:1px solid rgba(255,255,255,.55);
+  background:rgba(255,255,255,.08);
+  color:#fff;
+  padding:8px 12px;
+  border-radius:7px;
+  font-size:11px;
+  font-weight:700;
+}
+.btn-password:hover{background:rgba(255,255,255,.15)}
+@media(max-width:900px){
+  .topbar{align-items:flex-start;flex-wrap:wrap}
+  .user-area{min-width:0;flex-wrap:wrap}
+}
+
 /* APP SHELL */
 .app-shell{min-height:100vh;display:flex}
 .sidebar{
@@ -347,6 +406,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
       <button class="nav-btn" data-page="verificar"><span class="nav-icon">✓</span>Verificar Documento</button>
       <button class="nav-btn" data-page="historial"><span class="nav-icon">☷</span>Historial de Certificaciones</button>
       <button class="nav-btn" data-page="acerca"><span class="nav-icon">ⓘ</span>Acerca de SAMICERT</button>
+      <button class="nav-btn" data-page="seguridad"><span class="nav-icon">🔒</span>Seguridad / Contraseña</button>
     </nav>
 
     <div class="sidebar-footer">
@@ -369,7 +429,8 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
           <strong id="usuarioNombre">Usuario</strong>
           <span id="usuarioEmail">correo</span>
         </div>
-        <button class="btn-logout" id="btnCerrarSesion" type="button">Cerrar sesión</button>
+        <button class="btn-password" id="btnCambiarPassword" type="button">Cambiar contraseña</button>
+         <button class="btn-logout" id="btnCerrarSesion" type="button">Cerrar sesión</button>
       </div>
     </header>
 
@@ -536,6 +597,57 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
       </section>
 
       <!-- ACERCA -->
+      <!-- SEGURIDAD -->
+      <section class="page" id="page-seguridad">
+        <div class="section-head">
+          <h2>Seguridad de la cuenta</h2>
+          <p>Actualice la contraseña de acceso a SAMICERT.</p>
+        </div>
+
+        <div class="panel password-panel">
+          <div class="panel-title">Cambiar contraseña</div>
+          <div class="panel-subtitle">
+            Por seguridad, debe ingresar su contraseña actual antes de establecer una nueva.
+          </div>
+
+          <form id="passwordForm" class="password-form" autocomplete="off">
+            <div class="password-help">
+              La nueva contraseña debe tener como mínimo <strong>8 caracteres</strong>. 
+              Se recomienda combinar mayúsculas, minúsculas, números y símbolos.
+            </div>
+
+            <div class="field">
+              <label for="currentPassword">Contraseña actual</label>
+              <input id="currentPassword" type="password" autocomplete="current-password"
+                     minlength="6" required>
+            </div>
+
+            <div class="field">
+              <label for="newPassword">Nueva contraseña</label>
+              <input id="newPassword" type="password" autocomplete="new-password"
+                     minlength="8" required>
+            </div>
+
+            <div class="field">
+              <label for="confirmPassword">Confirmar nueva contraseña</label>
+              <input id="confirmPassword" type="password" autocomplete="new-password"
+                     minlength="8" required>
+            </div>
+
+            <div class="password-actions">
+              <button class="btn-primary" id="btnGuardarPassword" type="submit">
+                Actualizar contraseña
+              </button>
+              <button class="btn-gray" id="btnLimpiarPassword" type="button">
+                Limpiar
+              </button>
+            </div>
+
+            <div id="passwordMessage" class="password-message oculto"></div>
+          </form>
+        </div>
+      </section>
+
       <section class="page" id="page-acerca">
         <div class="section-head">
           <h2>Acerca de SAMICERT</h2>
@@ -578,7 +690,8 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, query, collection, where, limit, getDocs, serverTimestamp
@@ -597,6 +710,11 @@ const loginForm = $("loginForm");
 const loginError = $("loginError");
 const btnLogin = $("btnLogin");
 const btnCerrarSesion = $("btnCerrarSesion");
+const btnCambiarPassword = $("btnCambiarPassword");
+const passwordForm = $("passwordForm");
+const btnGuardarPassword = $("btnGuardarPassword");
+const btnLimpiarPassword = $("btnLimpiarPassword");
+const passwordMessage = $("passwordMessage");
 
 const drop = $("drop");
 const btnAplicar = $("btnAplicar");
@@ -1356,6 +1474,92 @@ async function cargarPerfil(user) {
   $("usuarioNombre").textContent = autorizado.nombre;
   $("usuarioEmail").textContent = autorizado.correo;
 }
+
+function mostrarMensajePassword(tipo, mensaje) {
+  passwordMessage.textContent = mensaje;
+  passwordMessage.className = `password-message ${tipo}`;
+}
+
+function limpiarFormularioPassword() {
+  passwordForm.reset();
+  passwordMessage.textContent = "";
+  passwordMessage.className = "password-message oculto";
+}
+
+function traducirErrorPassword(error) {
+  const code = error?.code || "";
+  const mensajes = {
+    "auth/wrong-password": "La contraseña actual es incorrecta.",
+    "auth/invalid-credential": "La contraseña actual es incorrecta.",
+    "auth/invalid-login-credentials": "La contraseña actual es incorrecta.",
+    "auth/weak-password": "La nueva contraseña es demasiado débil. Use al menos 8 caracteres.",
+    "auth/requires-recent-login": "Por seguridad, la sesión debe renovarse. Cierre sesión e ingrese nuevamente antes de cambiar la contraseña.",
+    "auth/too-many-requests": "Se han realizado demasiados intentos. Espere unos minutos e inténtelo nuevamente.",
+    "auth/network-request-failed": "No se pudo conectar con Firebase. Verifique su conexión a Internet."
+  };
+  return mensajes[code] || "No se pudo cambiar la contraseña. Inténtelo nuevamente.";
+}
+
+btnCambiarPassword.addEventListener("click", () => {
+  mostrarPagina("seguridad");
+  $("currentPassword").focus();
+});
+
+btnLimpiarPassword.addEventListener("click", limpiarFormularioPassword);
+
+passwordForm.addEventListener("submit", async e => {
+  e.preventDefault();
+
+  if (!usuarioActual || !usuarioActual.email) {
+    mostrarMensajePassword("error", "No hay una sesión activa.");
+    return;
+  }
+
+  const currentPassword = $("currentPassword").value;
+  const newPassword = $("newPassword").value;
+  const confirmPassword = $("confirmPassword").value;
+
+  if (newPassword.length < 8) {
+    mostrarMensajePassword("error", "La nueva contraseña debe tener como mínimo 8 caracteres.");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    mostrarMensajePassword("error", "La confirmación no coincide con la nueva contraseña.");
+    return;
+  }
+
+  if (currentPassword === newPassword) {
+    mostrarMensajePassword("error", "La nueva contraseña debe ser diferente de la contraseña actual.");
+    return;
+  }
+
+  btnGuardarPassword.disabled = true;
+  btnGuardarPassword.textContent = "Actualizando…";
+  passwordMessage.className = "password-message oculto";
+
+  try {
+    const credential = EmailAuthProvider.credential(
+      usuarioActual.email,
+      currentPassword
+    );
+
+    // Reautenticación: Firebase exige una sesión reciente para permitir
+    // operaciones sensibles como el cambio de contraseña.
+    await reauthenticateWithCredential(usuarioActual, credential);
+    await updatePassword(usuarioActual, newPassword);
+
+    limpiarFormularioPassword();
+    mostrarMensajePassword("success", "Contraseña actualizada correctamente. La nueva contraseña ya está activa.");
+
+  } catch (error) {
+    console.error("ERROR CAMBIO DE CONTRASEÑA:", error);
+    mostrarMensajePassword("error", traducirErrorPassword(error));
+  } finally {
+    btnGuardarPassword.disabled = false;
+    btnGuardarPassword.textContent = "Actualizar contraseña";
+  }
+});
 
 loginForm.addEventListener("submit",async e => {
   e.preventDefault();
