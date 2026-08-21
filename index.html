@@ -886,6 +886,8 @@ async function cargarSelloAutomatico() {
   selloBytes = null;
   const autorizado = USUARIOS_AUTORIZADOS[usuarioActual?.uid];
 
+  // El administrador no certifica documentos y, por tanto, no necesita sello.
+  if (usuarioActual?.uid === ADMIN_UID) return;
   if (!autorizado) throw new Error("Usuario no autorizado.");
 
   try {

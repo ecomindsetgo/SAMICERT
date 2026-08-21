@@ -55,3 +55,9 @@ El sistema calcula SHA-256 sobre los bytes exactos del PDF final después de apl
 - `firestore.rules` — seguridad de Firestore.
 - `sello-jorge.png` — sello del certificador Jorge.
 - `sello-roberto.png` — sello del certificador Roberto.
+
+
+## Corrección v2.0.1
+Se corrigió un error de sintaxis en `firebase-config.js` que impedía cargar el módulo JavaScript de Firebase. El archivo contenía secuencias `\n` literales después del objeto de configuración. Esto hacía que la aplicación no pudiera inicializar Firebase y, por tanto, ningún usuario podía ingresar.
+
+La aplicación debe publicarse mediante un servidor web (por ejemplo Netlify), no abrirse directamente con `file://`.

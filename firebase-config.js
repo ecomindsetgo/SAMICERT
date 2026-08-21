@@ -8,4 +8,9 @@ export const firebaseConfig = {
   storageBucket: "samicert-b8175.firebasestorage.app",
   messagingSenderId: "312782673633",
   appId: "1:312782673633:web:d30f688022e2c8d8c6c9a0"
-};\n\n// UID de la cuenta administradora.\n// IMPORTANTE: debe coincidir con el UID definido en firestore.rules.\nexport const ADMIN_UID = "OCsKdrDfB6h0Ey5RLjiWnvoOWqs1";\n
+};
+
+// UID de la cuenta administradora.
+// IMPORTANTE: debe coincidir con el UID definido en firestore.rules.
+// Déjelo vacío hasta crear la cuenta administrativa en Firebase Authentication.
+export const ADMIN_UID = "OCsKdrDfB6h0Ey5RLjiWnvoOWqs1";
