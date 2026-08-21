@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function esCertificador() {
+      return request.auth != null &&
+        (
+          request.auth.uid == "wBCSJ3XfHVaUZPLmC2yJddh5RXx1" ||
+          request.auth.uid == "4tdNYgErvlM7NB3hwP933avL3RT2"
+        );
+    }
+
+    match /usuarios/{uid} {
+      allow read: if esCertificador();
+      allow create, update: if esCertificador() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    match /certificaciones/{certificacionId} {
+      allow read: if esCertificador();
+      allow create: if esCertificador()
+        && request.resource.data.certificadorUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

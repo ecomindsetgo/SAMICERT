@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMICERT — Sistema de Archivo y Manejo de Información para la Certificación de Documentos</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<style>
+:root{
+  --navy:#06233a;
+  --navy-2:#0b3554;
+  --navy-3:#0f4770;
+  --blue:#1769d2;
+  --green:#16823a;
+  --purple:#5b2bb8;
+  --orange:#ea4f0a;
+  --ink:#142235;
+  --muted:#64748b;
+  --line:#e4e9ef;
+  --bg:#f5f7fa;
+  --card:#ffffff;
+  --danger:#b42318;
+  --shadow:0 8px 28px rgba(15,35,55,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:var(--bg)}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.oculto{display:none!important}
+
+/* LOGIN */
+.login-screen{
+  position:fixed;inset:0;z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  padding:22px;
+  background:linear-gradient(135deg,#041c2f,#0b3554);
+}
+.login-card{
+  width:min(470px,100%);
+  background:#fff;border-radius:18px;
+  padding:34px;
+  box-shadow:0 24px 70px rgba(0,0,0,.28);
+}
+.login-brand{display:flex;gap:16px;align-items:center;margin-bottom:24px}
+.logo{
+  width:64px;height:64px;display:grid;
+  grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;
+  gap:4px;flex:0 0 auto;
+}
+.logo span{display:block;border-radius:2px}
+.logo span:nth-child(1),.logo span:nth-child(4){background:#b52a1c}
+.logo span:nth-child(2),.logo span:nth-child(3){background:#7f8179}
+.login-card h1{font-size:27px;margin:0;line-height:1.05;color:var(--navy)}
+.login-card .sam{font-size:36px;font-weight:800;letter-spacing:1px;margin-top:4px}
+.login-card .inst{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.35}
+.login-card h2{margin:26px 0 8px;font-size:22px}
+.login-card p{margin:0 0 20px;color:var(--muted);font-size:13px;line-height:1.5}
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:15px}
+.field label{font-size:12px;font-weight:700;color:#475569}
+.field input{
+  border:1px solid #d5dce5;border-radius:9px;
+  padding:12px 13px;outline:none;background:#fff;
+}
+.field input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(23,105,210,.10)}
+.btn-primary{
+  border:0;border-radius:9px;background:var(--blue);color:#fff;
+  padding:12px 18px;font-weight:700;transition:.15s;
+}
+.btn-primary:hover{filter:brightness(.95)}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed}
+.login-btn{width:100%;margin-top:4px}
+.login-error{margin-top:12px;padding:10px 12px;border-radius:8px;background:#fff3f1;border:1px solid #f1c5bf;color:var(--danger);font-size:12px}
+
+/* APP SHELL */
+.app-shell{min-height:100vh;display:flex}
+.sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:250px;
+  background:linear-gradient(180deg,#041f33,#062b45);
+  color:#fff;padding:18px 12px;display:flex;flex-direction:column;
+  z-index:20;
+}
+.sidebar-brand{display:flex;gap:12px;align-items:center;padding:4px 10px 20px;border-bottom:1px solid rgba(255,255,255,.10)}
+.sidebar .logo{width:56px;height:56px}
+.sidebar-title{font-size:11px;line-height:1.25;color:#d8e4ee}
+.sidebar-title strong{display:block;font-size:27px;letter-spacing:1px;color:#fff;margin-bottom:2px}
+.nav{padding-top:18px;display:flex;flex-direction:column;gap:6px}
+.nav-btn{
+  width:100%;border:0;background:transparent;color:#e6eef5;
+  text-align:left;padding:13px 12px;border-radius:8px;
+  display:flex;align-items:center;gap:12px;font-size:14px;font-weight:600;
+}
+.nav-btn:hover{background:rgba(255,255,255,.08)}
+.nav-btn.active{background:linear-gradient(90deg,#0e5a91,#0b4772);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.nav-icon{width:24px;text-align:center;font-size:19px}
+.sidebar-footer{margin-top:auto;padding:16px 10px 4px;color:#b8c9d6;font-size:11px;line-height:1.55}
+
+.main{margin-left:250px;width:calc(100% - 250px);min-height:100vh}
+.topbar{
+  position:sticky;top:0;z-index:10;
+  min-height:116px;padding:18px 34px;
+  color:#fff;background:linear-gradient(110deg,#05243a,#0a3554 65%,#0c4167);
+  display:flex;align-items:center;justify-content:space-between;gap:25px;
+  box-shadow:0 4px 20px rgba(0,0,0,.10);
+}
+.top-title{text-align:center;flex:1}
+.top-title .long{font-size:17px;font-weight:700;line-height:1.25}
+.top-title .sam{font-size:40px;font-weight:900;letter-spacing:2px;line-height:1}
+.top-title .sub{font-size:15px;margin-top:5px;color:#dbe8f2}
+.user-area{display:flex;align-items:center;gap:12px;min-width:245px;justify-content:flex-end}
+.avatar{
+  width:48px;height:48px;border:2px solid rgba(255,255,255,.55);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;
+}
+.user-info{text-align:left}
+.user-info strong{display:block;font-size:13px}
+.user-info span{display:block;color:#c9d8e4;font-size:11px;margin-top:3px}
+.btn-logout{
+  border:1px solid rgba(255,255,255,.55);background:transparent;color:#fff;
+  padding:8px 12px;border-radius:7px;font-size:11px;font-weight:700;
+}
+.btn-logout:hover{background:rgba(255,255,255,.08)}
+
+.content{padding:26px 34px 42px;max-width:1450px;margin:0 auto}
+.page{display:none}
+.page.active{display:block}
+.welcome{
+  background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px;
+  box-shadow:var(--shadow);margin-bottom:20px;
+}
+.welcome h2{margin:0 0 8px;font-size:25px}
+.welcome p{margin:0;color:var(--muted);font-size:14px}
+.info-strip{
+  margin-top:18px;padding:12px 14px;border-left:4px solid var(--blue);
+  background:#f4f8ff;border-radius:8px;color:#334155;font-size:12px;line-height:1.5;
+}
+.cards{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;
+}
+.home-card{
+  background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px;
+  box-shadow:var(--shadow);min-height:205px;display:flex;gap:20px;align-items:center;
+}
+.card-icon{
+  width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:35px;flex:0 0 auto;
+}
+.card-green .card-icon{background:#e9f7ee;color:var(--green)}
+.card-blue .card-icon{background:#eaf2ff;color:var(--blue)}
+.card-purple .card-icon{background:#f0ebff;color:var(--purple)}
+.card-orange .card-icon{background:#fff0e8;color:var(--orange)}
+.home-card h3{margin:0 0 8px;font-size:19px}
+.home-card p{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.55}
+.btn-card{
+  border:0;border-radius:7px;padding:9px 15px;color:#fff;font-weight:700;font-size:12px;
+}
+.card-green .btn-card{background:var(--green)}
+.card-blue .btn-card{background:var(--blue)}
+.card-purple .btn-card{background:var(--purple)}
+.card-orange .btn-card{background:var(--orange)}
+.security{
+  margin-top:18px;padding:15px 18px;background:#fffaf0;border:1px solid #f3dfab;border-radius:10px;
+  font-size:12px;line-height:1.55;color:#475569;
+}
+.security strong{color:#7c5b08}
+
+.section-head{margin-bottom:18px}
+.section-head h2{margin:0 0 5px;font-size:25px}
+.section-head p{margin:0;color:var(--muted);font-size:13px}
+
+.panel{
+  background:#fff;border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);padding:24px;margin-bottom:18px;
+}
+.panel-title{font-size:17px;font-weight:800;margin-bottom:5px}
+.panel-subtitle{font-size:12px;color:var(--muted);line-height:1.5}
+
+.drop{
+  margin-top:16px;border:2px dashed #aebdcc;border-radius:12px;
+  padding:38px 20px;text-align:center;cursor:pointer;background:#fbfcfe;position:relative;
+  transition:.15s;
+}
+.drop:hover,.drop.dragover{border-color:var(--blue);background:#f5f9ff}
+.drop .icono{font-size:34px;margin-bottom:8px}
+.drop .txt1{font-size:15px;font-weight:700}
+.drop .txt2{font-size:12px;color:var(--muted);margin-top:5px}
+.archivo{
+  margin-top:14px;padding:11px 13px;background:#f8fafc;border:1px solid var(--line);
+  border-radius:9px;display:flex;align-items:center;gap:10px;font-size:12px;
+}
+.archivo .nombre{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.archivo .estado{font-size:10px;font-weight:800;text-transform:uppercase;padding:4px 8px;border-radius:999px}
+.estado.pendiente{background:#eef2f6;color:#64748b}
+.estado.procesando{background:#fff1cf;color:#8a6416}
+.estado.listo{background:#e6f6eb;color:#18733b}
+.estado.error{background:#fde8e6;color:#a13a2a}
+.archivo .quitar{border:0;background:transparent;color:#64748b;font-size:18px}
+
+.selector-paginas{margin-top:20px;border-top:1px solid var(--line);padding-top:20px}
+.selector-cabecera{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px}
+.selector-titulo{font-size:14px;font-weight:800}
+.selector-subtitulo{font-size:11.5px;color:var(--muted);margin-top:4px}
+.selector-acciones{display:flex;gap:7px;flex-wrap:wrap}
+.btn-small{
+  border:1px solid #d5dde7;background:#fff;color:#475569;border-radius:7px;padding:7px 10px;
+  font-size:11px;font-weight:700;
+}
+.btn-small:hover{background:#f8fafc}
+.visor-paginas{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:13px;
+  max-height:620px;overflow:auto;padding:5px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;
+}
+.pagina-card{position:relative;background:#fff;border:2px solid var(--line);border-radius:8px;padding:7px;cursor:pointer}
+.pagina-card:hover{border-color:#aebdcc}
+.pagina-card.seleccionada{border-color:var(--blue);box-shadow:0 0 0 2px rgba(23,105,210,.10)}
+.pagina-card.no-seleccionada{opacity:.58}
+.pagina-card canvas{display:block;width:100%;height:auto;background:#fff;border:1px solid #e8edf2}
+.pagina-meta{display:flex;justify-content:space-between;gap:7px;margin-top:7px;font-size:10.5px}
+.pagina-numero{font-weight:800}
+.pagina-estado{color:var(--blue);font-weight:800}
+.pagina-card.no-seleccionada .pagina-estado{color:#64748b}
+.pagina-check{position:absolute;top:10px;right:10px;width:20px;height:20px;accent-color:var(--blue)}
+.visor-cargando{grid-column:1/-1;padding:25px;text-align:center;color:var(--muted);font-size:12px}
+
+.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.btn-green{border:0;background:var(--green);color:#fff;border-radius:8px;padding:11px 17px;font-size:12px;font-weight:800}
+.btn-gray{border:1px solid #d5dde7;background:#fff;color:#475569;border-radius:8px;padding:11px 15px;font-size:12px;font-weight:700}
+.btn-green:disabled{opacity:.55;cursor:not-allowed}
+.fixed-config{
+  margin-top:16px;padding:11px 13px;background:#f7f9fb;border:1px solid var(--line);
+  border-radius:8px;font-size:11.5px;color:#526174;
+}
+.fixed-config strong{color:#1e293b}
+.hash-resultado{
+  margin-top:16px;padding:14px 16px;border:1px solid #d9e8de;border-left:4px solid var(--green);
+  background:#f6fbf8;border-radius:9px;
+}
+.hash-titulo{font-size:13px;font-weight:800;color:var(--green);margin-bottom:6px}
+.hash-nota{font-size:11px;color:var(--muted);line-height:1.5}
+.hash-fila{display:flex;gap:8px;align-items:center}
+.hash-fila input{flex:1;border:1px solid #d5dde7;border-radius:8px;padding:10px;font-size:12px}
+
+.query-row{display:flex;gap:9px;align-items:center}
+.query-row input{
+  flex:1;border:1px solid #d5dde7;border-radius:8px;padding:11px 12px;outline:none;font-size:12px;
+}
+.query-row input:focus{border-color:var(--blue)}
+.result-detail{font-size:12px;line-height:1.8;color:#334155}
+.result-detail strong{color:#172033}
+
+.verify-upload{
+  border:1px dashed #b8c5d3;border-radius:10px;padding:18px;background:#fafbfd;
+}
+.verify-upload input{font-size:12px}
+.verify-file-name{margin-top:10px;padding:10px 12px;border:1px solid var(--line);background:#f8fafc;border-radius:8px;font-size:12px;color:#334155;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.history-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.history-list{display:flex;flex-direction:column;gap:8px}
+.history-item{
+  display:grid;grid-template-columns:155px 1fr auto;gap:14px;align-items:center;
+  border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff;
+}
+.history-id{font-weight:800;color:var(--blue);font-size:11px}
+.history-file{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.history-meta{font-size:10.5px;color:var(--muted);margin-top:3px}
+.history-cert{font-size:11px;color:#334155;text-align:right}
+.empty{padding:30px;text-align:center;color:var(--muted);font-size:12px}
+
+.about-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.about-box{border:1px solid var(--line);border-radius:10px;padding:18px;background:#fff}
+.about-box h3{margin:0 0 7px;font-size:15px}
+.about-box p,.about-box li{font-size:12px;color:#5d6b7d;line-height:1.6}
+.about-box ul{margin:7px 0 0;padding-left:18px}
+
+footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+
+@media(max-width:1050px){
+  .sidebar{width:215px}.main{margin-left:215px;width:calc(100% - 215px)}
+  .top-title .long{font-size:14px}.top-title .sam{font-size:34px}.user-area{min-width:210px}
+}
+@media(max-width:800px){
+  .sidebar{position:static;width:100%;height:auto;padding:10px}
+  .app-shell{display:block}.main{margin-left:0;width:100%}
+  .sidebar-brand{border-bottom:0;padding-bottom:8px}
+  .nav{flex-direction:row;overflow:auto;padding-top:6px}
+  .nav-btn{white-space:nowrap;width:auto}.nav-icon{display:none}
+  .sidebar-footer{display:none}
+  .topbar{position:static;flex-direction:column;padding:18px}.user-area{min-width:0;width:100%;justify-content:center}
+  .content{padding:18px}.cards,.about-grid{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  .top-title .long{font-size:12px}.top-title .sam{font-size:30px}.top-title .sub{font-size:12px}
+  .home-card{align-items:flex-start;flex-direction:column}
+  .query-row{flex-direction:column;align-items:stretch}
+  .history-item{grid-template-columns:1fr}.history-cert{text-align:left}
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="logo"><span></span><span></span><span></span><span></span></div>
+      <div>
+        <h1>Sistema de Archivo y Manejo de Información para la Certificación de Documentos</h1>
+        <div class="sam">SAMICERT</div>
+        <div class="inst">Archivo Desconcentrado · Corte Superior de Justicia del Santa</div>
+      </div>
+    </div>
+    <h2>Acceso al sistema</h2>
+    <p>Ingresa con una de las cuentas autorizadas para certificar documentos y consultar las certificaciones registradas.</p>
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginEmail">Correo electrónico</label>
+        <input id="loginEmail" type="email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="loginPassword">Contraseña</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn-primary login-btn" type="submit" id="btnLogin">Ingresar</button>
+      <div id="loginError" class="login-error oculto"></div>
+    </form>
+  </div>
+</div>
+
+<!-- APPLICATION -->
+<div class="app-shell oculto" id="app">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo"><span></span><span></span><span></span><span></span></div>
+      <div class="sidebar-title">
+        <strong>SAMICERT</strong>
+        Sistema de Archivo y Manejo de Información para la Certificación de Documentos
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-btn active" data-page="inicio"><span class="nav-icon">⌂</span>Inicio</button>
+      <button class="nav-btn" data-page="certificar"><span class="nav-icon">▣</span>Certificar Documento</button>
+      <button class="nav-btn" data-page="verificar"><span class="nav-icon">✓</span>Verificar Documento</button>
+      <button class="nav-btn" data-page="historial"><span class="nav-icon">☷</span>Historial de Certificaciones</button>
+      <button class="nav-btn" data-page="acerca"><span class="nav-icon">ⓘ</span>Acerca de SAMICERT</button>
+    </nav>
+
+    <div class="sidebar-footer">
+      SAMICERT v1.0.0<br>
+      © 2026 Poder Judicial del Perú
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="top-title">
+        <div class="long">Sistema de Archivo y Manejo de Información para la Certificación de Documentos</div>
+        <div class="sam">SAMICERT</div>
+        <div class="sub">Archivo Desconcentrado · Corte Superior de Justicia del Santa</div>
+      </div>
+
+      <div class="user-area">
+        <div class="avatar">●</div>
+        <div class="user-info">
+          <strong id="usuarioNombre">Usuario</strong>
+          <span id="usuarioEmail">correo</span>
+        </div>
+        <button class="btn-logout" id="btnCerrarSesion" type="button">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- INICIO -->
+      <section class="page active" id="page-inicio">
+        <div class="welcome">
+          <h2>Bienvenido al sistema SAMICERT</h2>
+          <p>Seleccione una opción del menú para comenzar.</p>
+          <div class="info-strip">
+            <strong>Certificación automática:</strong> el sello se asigna automáticamente según el usuario que inició sesión. El sistema no permite cambiarlo desde la pantalla.
+          </div>
+        </div>
+
+        <div class="cards">
+          <div class="home-card card-green">
+            <div class="card-icon">▣</div>
+            <div>
+              <h3>Certificar Documento</h3>
+              <p>Seleccione un PDF, elija las páginas y aplique el sello de certificación. El sistema genera automáticamente el identificador y registra la huella SHA-256.</p>
+              <button class="btn-card" data-go="certificar">Ir a Certificar</button>
+            </div>
+          </div>
+
+          <div class="home-card card-blue">
+            <div class="card-icon">✓</div>
+            <div>
+              <h3>Verificar Documento</h3>
+              <p>Verifique un documento certificado mediante su huella SHA-256. SAMICERT indicará quién realizó la certificación y sus datos de registro.</p>
+              <button class="btn-card" data-go="verificar">Ir a Verificar</button>
+            </div>
+          </div>
+
+          <div class="home-card card-purple">
+            <div class="card-icon">↺</div>
+            <div>
+              <h3>Historial de Certificaciones</h3>
+              <p>Consulte las certificaciones registradas por ambos certificadores y revise el historial centralizado de SAMICERT.</p>
+              <button class="btn-card" data-go="historial">Ver Historial</button>
+            </div>
+          </div>
+
+          <div class="home-card card-orange">
+            <div class="card-icon">i</div>
+            <div>
+              <h3>Acerca de SAMICERT</h3>
+              <p>Conozca el propósito del sistema, su funcionamiento y las medidas utilizadas para conservar los registros de certificación.</p>
+              <button class="btn-card" data-go="acerca">Más información</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="security">
+          <strong>Importante:</strong> una vez registrada una certificación, su información queda protegida mediante las reglas de seguridad del sistema. El identificador y SHA-256 se almacenan automáticamente y no se presentan como datos para copiar.
+        </div>
+      </section>
+
+      <!-- CERTIFICAR -->
+      <section class="page" id="page-certificar">
+        <div class="section-head">
+          <h2>Certificar Documento</h2>
+          <p>Seleccione el PDF y las páginas que serán certificadas.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Documento PDF</div>
+          <div class="panel-subtitle">El sello correspondiente al usuario que inició sesión se aplica automáticamente.</div>
+
+          <div class="drop" id="drop">
+            <div class="icono">📄</div>
+            <div class="txt1">Haz clic para seleccionar el PDF que deseas certificar</div>
+            <div class="txt2">También puedes arrastrar y soltar un archivo PDF aquí</div>
+          </div>
+
+          <div class="lista oculto" id="lista"></div>
+
+          <div id="selectorPaginas" class="selector-paginas oculto">
+            <div class="selector-cabecera">
+              <div>
+                <div class="selector-titulo">Páginas a certificar</div>
+                <div class="selector-subtitulo" id="resumenPaginas">Selecciona las páginas que deseas sellar.</div>
+              </div>
+              <div class="selector-acciones">
+                <button type="button" class="btn-small" id="btnTodas">Todas</button>
+                <button type="button" class="btn-small" id="btnNinguna">Ninguna</button>
+                <button type="button" class="btn-small" id="btnInvertir">Invertir</button>
+              </div>
+            </div>
+            <div id="visorPaginas" class="visor-paginas"></div>
+          </div>
+
+          <div class="fixed-config">
+            <strong>Configuración fija del sello:</strong> tamaño <strong>90 pt</strong> · margen <strong>3 pt</strong>. El sello no puede modificarse desde la aplicación y se selecciona automáticamente según el usuario autenticado.
+          </div>
+
+          <div class="actions">
+            <button class="btn-green" id="btnAplicar" disabled>Aplicar sello y guardar</button>
+            <button class="btn-gray oculto" id="btnLimpiar">Quitar documento</button>
+          </div>
+
+          <div id="hashResultado" class="hash-resultado oculto"></div>
+        </div>
+      </section>
+
+      <!-- VERIFICAR -->
+      <section class="page" id="page-verificar">
+        <div class="section-head">
+          <h2>Verificar Documento</h2>
+          <p>Compruebe si el PDF corresponde exactamente a una certificación registrada en SAMICERT.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Verificar SHA-256 de un PDF</div>
+          <div class="panel-subtitle" style="margin-bottom:13px">
+            Seleccione el PDF certificado. SAMICERT calculará automáticamente su huella SHA-256 y realizará automáticamente la consulta del registro. La huella no se muestra para copiar.
+          </div>
+          <div class="verify-upload">
+            <input type="file" id="inputVerificarPdf" accept="application/pdf,.pdf">
+            <div id="archivoVerificacionNombre" class="verify-file-name oculto"></div>
+          </div>
+
+          <div id="hashVerificado" class="hash-resultado oculto">
+            <div id="coincidenciaHash"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Consultar certificado por identificador</div>
+          <div class="panel-subtitle" style="margin-bottom:13px">Ingrese el identificador de certificación registrado en el documento.</div>
+          <div class="query-row">
+            <input type="text" id="inputConsultaId" placeholder="CERT-2026-XXXXXXXXXXXX">
+            <button type="button" class="btn-primary" id="btnConsultar">Buscar</button>
+          </div>
+
+          <div id="resultadoConsulta" class="hash-resultado oculto">
+            <div class="hash-titulo">Certificado encontrado</div>
+            <div id="detalleConsulta" class="result-detail"></div>
+          </div>
+
+          <div id="noEncontradoConsulta" class="hash-resultado oculto" style="border-left-color:#b42318;background:#fff7f5">
+            <div class="hash-titulo" style="color:#b42318">No se encontró ese certificado</div>
+            <div class="hash-nota">Verifique el identificador ingresado.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HISTORIAL -->
+      <section class="page" id="page-historial">
+        <div class="section-head">
+          <h2>Historial de Certificaciones</h2>
+          <p>Registro centralizado de las certificaciones realizadas por los dos usuarios autorizados.</p>
+        </div>
+
+        <div class="panel">
+          <div class="history-toolbar">
+            <div class="panel-title" style="margin:0">Certificaciones registradas</div>
+            <button class="btn-small" id="btnActualizarHistorial">Actualizar</button>
+          </div>
+          <div id="historialLista" class="history-list">
+            <div class="empty">Cargando historial…</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ACERCA -->
+      <section class="page" id="page-acerca">
+        <div class="section-head">
+          <h2>Acerca de SAMICERT</h2>
+          <p>Sistema de Archivo y Manejo de Información para la Certificación de Documentos.</p>
+        </div>
+
+        <div class="panel">
+          <div class="about-grid">
+            <div class="about-box">
+              <h3>Finalidad</h3>
+              <p>SAMICERT permite certificar documentos PDF aplicando automáticamente el sello correspondiente al usuario autenticado y registrar la certificación para su posterior verificación.</p>
+            </div>
+            <div class="about-box">
+              <h3>Certificadores autorizados</h3>
+              <ul>
+                <li>Jorge Luis Desposorio Castillo — jdesposorio@pj.gob.pe</li>
+                <li>Roberto Alexander Dávila Arquiñigo — rdavilaaa@pj.gob.pe</li>
+              </ul>
+            </div>
+            <div class="about-box">
+              <h3>Integridad documental</h3>
+              <p>El sistema calcula el SHA-256 sobre los bytes exactos del PDF final después de aplicar el sello. Esa huella queda registrada automáticamente en Firestore.</p>
+            </div>
+            <div class="about-box">
+              <h3>Seguridad</h3>
+              <p>El acceso requiere autenticación. Las certificaciones registradas están protegidas para impedir modificaciones o eliminaciones desde la aplicación.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <strong>SAMICERT</strong> · Sistema de Archivo y Manejo de Información para la Certificación de Documentos<br>
+        Poder Judicial del Perú · Archivo Desconcentrado · Corte Superior de Justicia del Santa
+      </footer>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, query, collection, where, limit, getDocs, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
+
+const appFirebase = initializeApp(firebaseConfig);
+const auth = getAuth(appFirebase);
+const db = getFirestore(appFirebase);
+
+const $ = id => document.getElementById(id);
+
+const loginScreen = $("loginScreen");
+const appScreen = $("app");
+const loginForm = $("loginForm");
+const loginError = $("loginError");
+const btnLogin = $("btnLogin");
+const btnCerrarSesion = $("btnCerrarSesion");
+
+const drop = $("drop");
+const btnAplicar = $("btnAplicar");
+const btnLimpiar = $("btnLimpiar");
+const lista = $("lista");
+
+let archivoSeleccionado = null;
+let resultadoBlob = null;
+let nombreSalida = null;
+let paginasSeleccionadas = new Set();
+let totalPaginas = 0;
+let pdfVista = null;
+let usuarioActual = null;
+let perfilActual = null;
+let selloBytes = null;
+
+const TAMANO_SELLO_PT = 90;
+const MARGEN_SELLO_PT = 3;
+const ESQUINA_SELLO = "inferior-derecha";
+
+const USUARIOS_AUTORIZADOS = {
+  "wBCSJ3XfHVaUZPLmC2yJddh5RXx1": {
+    nombre: "Jorge Luis Desposorio Castillo",
+    correo: "jdesposorio@pj.gob.pe",
+    sello: "./sello-jorge.png"
+  },
+  "4tdNYgErvlM7NB3hwP933avL3RT2": {
+    nombre: "Roberto Alexander Dávila Arquiñigo",
+    correo: "rdavilaaa@pj.gob.pe",
+    sello: "./sello-roberto.png"
+  }
+};
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"
+  }[c]));
+}
+
+function fechaHoy() {
+  return new Intl.DateTimeFormat("es-PE", {
+    timeZone:"America/Lima", year:"numeric", month:"2-digit", day:"2-digit"
+  }).format(new Date());
+}
+
+function horaAhora() {
+  return new Intl.DateTimeFormat("es-PE", {
+    timeZone:"America/Lima", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false
+  }).format(new Date());
+}
+
+function generarIdCertificacion() {
+  const letras = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let r = "";
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  for (const b of bytes) r += letras[b % letras.length];
+  return `CERT-${new Date().getFullYear()}-${r}`;
+}
+
+async function calcularSHA256(bytes) {
+  const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+function ocultarHash() {
+  $("hashResultado").classList.add("oculto");
+}
+
+function mostrarEstado(mensaje, tipo="ok") {
+  const box = $("hashResultado");
+  box.classList.remove("oculto");
+  box.style.borderLeftColor = tipo === "error" ? "#b42318" : "#16823a";
+  box.style.background = tipo === "error" ? "#fff7f5" : "#f6fbf8";
+  box.innerHTML = `<div class="hash-titulo" style="color:${tipo === "error" ? "#b42318" : "#16823a"}">${escapeHtml(mensaje)}</div>`;
+}
+
+function base64FromBytes(bytes) {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i=0; i<bytes.length; i+=chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i+chunk, bytes.length)));
+  }
+  return btoa(binary);
+}
+
+async function cargarSelloAutomatico() {
+  selloBytes = null;
+  const autorizado = USUARIOS_AUTORIZADOS[usuarioActual?.uid];
+
+  if (!autorizado) throw new Error("Usuario no autorizado.");
+
+  try {
+    const response = await fetch(autorizado.sello, { cache:"no-store" });
+    if (!response.ok) throw new Error(`No se encontró ${autorizado.sello}`);
+    const buffer = await response.arrayBuffer();
+    selloBytes = new Uint8Array(buffer);
+
+    if (!selloBytes.length) throw new Error("El archivo del sello está vacío.");
+
+    // Solo se mantiene en memoria; no se muestra ni se permite cambiar desde la interfaz.
+    console.log(`Sello automático cargado para ${autorizado.nombre}.`);
+  } catch (error) {
+    console.error(error);
+    selloBytes = null;
+    throw new Error(`No se pudo cargar automáticamente el sello de ${autorizado.nombre}. Verifique que ${autorizado.sello.replace("./","")} esté en la misma carpeta que index.html.`);
+  }
+}
+
+function renderLista() {
+  if (!archivoSeleccionado) {
+    lista.classList.add("oculto");
+    lista.innerHTML = "";
+    btnAplicar.disabled = true;
+    btnLimpiar.classList.add("oculto");
+    return;
+  }
+
+  lista.classList.remove("oculto");
+  btnLimpiar.classList.remove("oculto");
+  btnAplicar.disabled = paginasSeleccionadas.size === 0 || !selloBytes;
+
+  const estadoClase =
+    archivoSeleccionado.estado === "procesando" ? "procesando" :
+    archivoSeleccionado.estado.startsWith("listo") ? "listo" :
+    archivoSeleccionado.estado === "error" ? "error" : "pendiente";
+
+  lista.innerHTML = `
+    <div class="archivo">
+      <span>📄</span>
+      <span class="nombre">${escapeHtml(archivoSeleccionado.name)}</span>
+      <span class="estado ${estadoClase}">${escapeHtml(archivoSeleccionado.estado)}</span>
+      <button class="quitar" id="btnQuitarArchivo" title="Quitar documento">×</button>
+    </div>`;
+
+  $("btnQuitarArchivo").onclick = limpiarArchivo;
+}
+
+function actualizarResumenPaginas() {
+  const n = paginasSeleccionadas.size;
+  $("resumenPaginas").textContent =
+    `${n} de ${totalPaginas} página(s) seleccionada(s) para certificar.`;
+  btnAplicar.disabled = !archivoSeleccionado || n === 0 || !selloBytes;
+}
+
+async function cargarVisorPaginas(file) {
+  const selector = $("selectorPaginas");
+  const visor = $("visorPaginas");
+
+  selector.classList.remove("oculto");
+  visor.innerHTML = '<div class="visor-cargando">Cargando vista previa de las páginas…</div>';
+  $("resumenPaginas").textContent = "Cargando páginas…";
+
+  try {
+    const bytes = await file.arrayBuffer();
+    pdfVista = await pdfjsLib.getDocument({data:bytes}).promise;
+    totalPaginas = pdfVista.numPages;
+    paginasSeleccionadas = new Set(
+      Array.from({length:totalPaginas}, (_,i) => i + 1)
+    );
+    visor.innerHTML = "";
+
+    for (let numero=1; numero<=totalPaginas; numero++) {
+      const pagina = await pdfVista.getPage(numero);
+      const baseViewport = pagina.getViewport({scale:1});
+      const escala = 138 / baseViewport.width;
+      const viewport = pagina.getViewport({scale:escala});
+
+      const card = document.createElement("div");
+      card.className = "pagina-card seleccionada";
+      card.dataset.page = String(numero);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+
+      const meta = document.createElement("div");
+      meta.className = "pagina-meta";
+
+      const numeroEl = document.createElement("span");
+      numeroEl.className = "pagina-numero";
+      numeroEl.textContent = `Página ${numero}`;
+
+      const estadoEl = document.createElement("span");
+      estadoEl.className = "pagina-estado";
+      estadoEl.textContent = "Certificar";
+
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "pagina-check";
+      check.checked = true;
+      check.setAttribute("aria-label", `Certificar página ${numero}`);
+
+      meta.append(numeroEl, estadoEl);
+      card.append(canvas, meta, check);
+      visor.appendChild(card);
+
+      await pagina.render({
+        canvasContext:canvas.getContext("2d"),
+        viewport
+      }).promise;
+
+      const actualizar = () => {
+        const activa = check.checked;
+        if (activa) {
+          paginasSeleccionadas.add(numero);
+          card.classList.add("seleccionada");
+          card.classList.remove("no-seleccionada");
+          estadoEl.textContent = "Certificar";
+        } else {
+          paginasSeleccionadas.delete(numero);
+          card.classList.remove("seleccionada");
+          card.classList.add("no-seleccionada");
+          estadoEl.textContent = "No certificar";
+        }
+        actualizarResumenPaginas();
+      };
+
+      check.addEventListener("change", actualizar);
+      card.addEventListener("click", e => {
+        if (e.target === check) return;
+        check.checked = !check.checked;
+        actualizar();
+      });
+    }
+
+    actualizarResumenPaginas();
+  } catch (error) {
+    console.error(error);
+    visor.innerHTML =
+      '<div class="visor-cargando">No se pudo mostrar la vista previa del PDF.</div>';
+    $("resumenPaginas").textContent =
+      "No fue posible cargar el selector de páginas.";
+    paginasSeleccionadas.clear();
+    actualizarResumenPaginas();
+  }
+}
+
+function resetearEstadoSesion() {
+  // Limpia por completo el documento que pudiera haber quedado en memoria
+  // para que el siguiente usuario nunca herede archivos ni páginas del anterior.
+  if (resultadoBlob) {
+    try { URL.revokeObjectURL(resultadoBlob); } catch (_) {}
+  }
+
+  archivoSeleccionado = null;
+  resultadoBlob = null;
+  nombreSalida = null;
+  paginasSeleccionadas = new Set();
+  totalPaginas = 0;
+  pdfVista = null;
+  selloBytes = null;
+  perfilActual = null;
+
+  const inputVerificar = $("inputVerificarPdf");
+  if (inputVerificar) inputVerificar.value = "";
+  if ($("archivoVerificacionNombre")) {
+    $("archivoVerificacionNombre").textContent = "";
+    $("archivoVerificacionNombre").classList.add("oculto");
+  }
+
+  const selector = $("selectorPaginas");
+  const visor = $("visorPaginas");
+  if (selector) selector.classList.add("oculto");
+  if (visor) visor.innerHTML = "";
+  if ($("resumenPaginas")) {
+    $("resumenPaginas").textContent = "Selecciona las páginas que deseas sellar.";
+  }
+
+  ocultarHash();
+  renderLista();
+
+  // Limpia también los resultados de consulta/verificación de la sesión anterior.
+  if ($("resultadoConsulta")) $("resultadoConsulta").classList.add("oculto");
+  if ($("noEncontradoConsulta")) $("noEncontradoConsulta").classList.add("oculto");
+  if ($("coincidenciaHash")) {
+    $("coincidenciaHash").innerHTML = "";
+    $("coincidenciaHash").classList.add("oculto");
+  }
+  if ($("hashVerificado")) $("hashVerificado").classList.add("oculto");
+  if ($("inputConsultaId")) $("inputConsultaId").value = "";
+
+  // Vuelve siempre al inicio para que cada sesión empiece limpia.
+  mostrarPagina("inicio");
+}
+
+function seleccionarPdf(file) {
+  if (!file || file.type !== "application/pdf") {
+    alert("Selecciona un archivo PDF válido.");
+    return;
+  }
+
+  archivoSeleccionado = {
+    file,
+    name:file.name,
+    estado:"pendiente"
+  };
+
+  resultadoBlob = null;
+  nombreSalida = null;
+  ocultarHash();
+  paginasSeleccionadas.clear();
+  totalPaginas = 0;
+  $("selectorPaginas").classList.add("oculto");
+  $("visorPaginas").innerHTML = "";
+
+  renderLista();
+  cargarVisorPaginas(file);
+}
+
+function limpiarArchivo() {
+  if (resultadoBlob) URL.revokeObjectURL(resultadoBlob);
+  archivoSeleccionado = null;
+  resultadoBlob = null;
+  nombreSalida = null;
+  paginasSeleccionadas.clear();
+  totalPaginas = 0;
+  pdfVista = null;
+
+  $("selectorPaginas").classList.add("oculto");
+  $("visorPaginas").innerHTML = "";
+  $("resumenPaginas").textContent = "Selecciona las páginas que deseas sellar.";
+  ocultarHash();
+  renderLista();
+}
+
+drop.addEventListener("click", () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/pdf,.pdf";
+  input.onchange = () => {
+    if (input.files?.length) seleccionarPdf(input.files[0]);
+  };
+  input.click();
+});
+
+drop.addEventListener("dragover", e => {
+  e.preventDefault();
+  drop.classList.add("dragover");
+});
+drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
+drop.addEventListener("drop", e => {
+  e.preventDefault();
+  drop.classList.remove("dragover");
+  const f = Array.from(e.dataTransfer.files || [])[0];
+  if (f) seleccionarPdf(f);
+});
+
+btnLimpiar.addEventListener("click", limpiarArchivo);
+
+$("btnTodas").onclick = () => {
+  document.querySelectorAll(".pagina-check").forEach(c => {
+    if (!c.checked) {
+      c.checked = true;
+      c.dispatchEvent(new Event("change"));
+    }
+  });
+};
+
+$("btnNinguna").onclick = () => {
+  document.querySelectorAll(".pagina-check").forEach(c => {
+    if (c.checked) {
+      c.checked = false;
+      c.dispatchEvent(new Event("change"));
+    }
+  });
+};
+
+$("btnInvertir").onclick = () => {
+  document.querySelectorAll(".pagina-check").forEach(c => {
+    c.checked = !c.checked;
+    c.dispatchEvent(new Event("change"));
+  });
+};
+
+async function aplicarSelloAUnPdf(file) {
+  if (!selloBytes) {
+    throw new Error("El sello automático de este usuario no está disponible.");
+  }
+
+  const {PDFDocument, rgb, StandardFonts} = PDFLib;
+  const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
+
+  const sellImage = await pdfDoc.embedPng(selloBytes);
+  const fuente = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const tamano = TAMANO_SELLO_PT;
+  const margen = MARGEN_SELLO_PT;
+  const esquina = ESQUINA_SELLO;
+
+  const paginas = pdfDoc.getPages();
+
+  if (!paginasSeleccionadas.size) {
+    throw new Error("Debes seleccionar al menos una página para certificar.");
+  }
+
+  const fecha = fechaHoy();
+  const hora = horaAhora();
+  const certId = generarIdCertificacion();
+
+  paginas.forEach((pagina, indice) => {
+    const n = indice + 1;
+    if (!paginasSeleccionadas.has(n)) return;
+
+    const {width,height} = pagina.getSize();
+    let x,y;
+
+    if (esquina === "inferior-derecha") {
+      x = width - tamano - margen;
+      y = margen;
+    } else if (esquina === "inferior-izquierda") {
+      x = margen;
+      y = margen;
+    } else if (esquina === "superior-derecha") {
+      x = width - tamano - margen;
+      y = height - tamano - margen;
+    } else {
+      x = margen;
+      y = height - tamano - margen;
+    }
+
+    pagina.drawImage(sellImage, {
+      x,y,width:tamano,height:tamano
+    });
+
+    const tamFuenteFecha = Math.max(6.5,tamano*0.078);
+    const tamFuenteHora = Math.max(4.2,tamFuenteFecha*0.55);
+    const tamFuenteId = Math.max(3.8,tamFuenteFecha*0.48);
+
+    const anchoFecha = fuente.widthOfTextAtSize(fecha,tamFuenteFecha);
+    const anchoHora = fuente.widthOfTextAtSize(hora,tamFuenteHora);
+    const anchoId = fuente.widthOfTextAtSize(certId,tamFuenteId);
+
+    pagina.drawText(fecha,{
+      x:x+tamano/2-anchoFecha/2,
+      y:y+tamano*0.49,
+      size:tamFuenteFecha,
+      font:fuente,
+      color:rgb(0.67,0.14,0.09)
+    });
+
+    pagina.drawText(hora,{
+      x:x+tamano/2-anchoHora/2,
+      y:y+tamano*0.49-tamFuenteFecha*0.85,
+      size:tamFuenteHora,
+      font:fuente,
+      color:rgb(0.67,0.14,0.09)
+    });
+
+    pagina.drawText(certId,{
+      x:x+tamano/2-anchoId/2,
+      y:y+tamano*0.49-tamFuenteFecha*1.55,
+      size:tamFuenteId,
+      font:fuente,
+      color:rgb(0.67,0.14,0.09)
+    });
+  });
+
+  return {
+    bytesSalida:await pdfDoc.save(),
+    meta:{
+      id:certId,
+      fecha,
+      hora,
+      archivoOriginal:file.name,
+      paginasCertificadas:Array.from(paginasSeleccionadas).sort((a,b)=>a-b),
+      totalPaginas:paginas.length
+    }
+  };
+}
+
+function nombreConSufijo(nombre) {
+  const idx = nombre.toLowerCase().lastIndexOf(".pdf");
+  return idx === -1
+    ? nombre + "_F.pdf"
+    : nombre.slice(0,idx) + "[F]" + nombre.slice(idx);
+}
+
+async function guardarResultado(bytesSalida,nombre) {
+  const blob = new Blob([bytesSalida],{type:"application/pdf"});
+
+  if ("showSaveFilePicker" in window) {
+    const handle = await window.showSaveFilePicker({
+      suggestedName:nombre,
+      types:[{
+        description:"Documento PDF",
+        accept:{"application/pdf":[".pdf"]}
+      }]
+    });
+
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return true;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url),2000);
+  return true;
+}
+
+btnAplicar.addEventListener("click",async () => {
+  if (!archivoSeleccionado || !usuarioActual) return;
+
+  btnAplicar.disabled = true;
+  archivoSeleccionado.estado = "procesando";
+  renderLista();
+
+  try {
+    const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
+    const sha256 = await calcularSHA256(resultado.bytesSalida);
+
+    const registro = {
+      ...resultado.meta,
+      sha256,
+      certificadorUid:usuarioActual.uid,
+      certificadorNombre:perfilActual?.nombre || usuarioActual.displayName || usuarioActual.email || "Usuario autorizado",
+      certificadorEmail:usuarioActual.email || "",
+      zonaHoraria:"America/Lima",
+      selloArchivo:USUARIOS_AUTORIZADOS[usuarioActual.uid].sello.replace("./",""),
+      creadoEn:serverTimestamp(),
+      version:6,
+      estado:"certificado"
+    };
+
+    await setDoc(doc(db,"certificaciones",resultado.meta.id),registro);
+    await guardarResultado(resultado.bytesSalida,nombreConSufijo(archivoSeleccionado.name));
+
+    // La certificación terminó correctamente. Retiramos inmediatamente
+    // el PDF de la pantalla para que no vuelva a aparecer como pendiente.
+    limpiarArchivo();
+
+    mostrarEstado(
+      "Certificación registrada correctamente. El identificador y SHA-256 fueron almacenados automáticamente."
+    );
+  } catch (err) {
+    console.error(err);
+
+    if (err.name === "AbortError") {
+      archivoSeleccionado.estado = "pendiente";
+    } else {
+      archivoSeleccionado.estado = "error";
+      mostrarEstado(
+        "No se pudo completar la certificación. " + (err.message || ""),
+        "error"
+      );
+    }
+
+    renderLista();
+  } finally {
+    btnAplicar.disabled = false;
+    renderLista();
+  }
+});
+
+async function renderDetalleConsulta(registro) {
+  const paginas = (registro.paginasCertificadas || []).join(", ");
+
+  $("detalleConsulta").innerHTML = `
+    <strong>ID de certificación:</strong> ${escapeHtml(registro.id)}<br>
+    <strong>Certificado por:</strong> ${escapeHtml(registro.certificadorNombre || registro.certificadorEmail || "Usuario autorizado")}<br>
+    <strong>Correo:</strong> ${escapeHtml(registro.certificadorEmail || "")}<br>
+    <strong>Archivo original:</strong> ${escapeHtml(registro.archivoOriginal || "")}<br>
+    <strong>Fecha / hora:</strong> ${escapeHtml(registro.fecha || "")} ${escapeHtml(registro.hora || "")}<br>
+    <strong>Páginas certificadas:</strong> ${escapeHtml(paginas)} de ${escapeHtml(registro.totalPaginas || "")}<br>
+    <strong>Estado:</strong> Certificación registrada
+  `;
+
+  $("resultadoConsulta").classList.remove("oculto");
+  $("noEncontradoConsulta").classList.add("oculto");
+}
+
+$("btnConsultar").addEventListener("click",async () => {
+  const id = $("inputConsultaId").value.trim().toUpperCase();
+  if (!id) return;
+
+  $("resultadoConsulta").classList.add("oculto");
+  $("noEncontradoConsulta").classList.add("oculto");
+
+  try {
+    const snap = await getDoc(doc(db,"certificaciones",id));
+
+    if (snap.exists()) {
+      renderDetalleConsulta(snap.data());
+    } else {
+      $("noEncontradoConsulta").classList.remove("oculto");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("No se pudo consultar el registro. " + (err.message || ""));
+  }
+});
+
+$("inputConsultaId").addEventListener("keydown",e => {
+  if (e.key === "Enter") $("btnConsultar").click();
+});
+
+$("inputVerificarPdf").addEventListener("change",async e => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const resultadoBox = $("hashVerificado");
+  const detalle = $("coincidenciaHash");
+  const nombreArchivo = $("archivoVerificacionNombre");
+
+  if (nombreArchivo) {
+    nombreArchivo.textContent = `PDF seleccionado: ${file.name}`;
+    nombreArchivo.classList.remove("oculto");
+  }
+
+  resultadoBox.classList.remove("oculto");
+  detalle.classList.remove("oculto");
+  detalle.innerHTML = '<div class="hash-titulo">Verificando el documento…</div><div class="hash-nota">Calculando la huella digital y consultando el registro.</div>';
+
+  try {
+    if (file.type && file.type !== "application/pdf") {
+      throw new Error("El archivo seleccionado no es un PDF válido.");
+    }
+
+    const bytes = await file.arrayBuffer();
+    const hash = await calcularSHA256(bytes);
+
+    const q = query(
+      collection(db,"certificaciones"),
+      where("sha256","==",hash),
+      limit(1)
+    );
+
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      const registro = snap.docs[0].data();
+      detalle.innerHTML = `
+        <div class="hash-titulo">✓ Este PDF SÍ corresponde a una certificación registrada</div>
+        <div class="result-detail">
+          <strong>ID de certificación:</strong> ${escapeHtml(registro.id || snap.docs[0].id)}<br>
+          <strong>Certificado por:</strong> ${escapeHtml(registro.certificadorNombre || registro.certificadorEmail || "Usuario autorizado")}<br>
+          <strong>Correo:</strong> ${escapeHtml(registro.certificadorEmail || "")}<br>
+          <strong>Archivo original:</strong> ${escapeHtml(registro.archivoOriginal || "")}<br>
+          <strong>Fecha / hora:</strong> ${escapeHtml(registro.fecha || "")} ${escapeHtml(registro.hora || "")}<br>
+          <strong>Páginas certificadas:</strong> ${escapeHtml((registro.paginasCertificadas || []).join(", "))} de ${escapeHtml(registro.totalPaginas || "")}<br>
+          <strong>Estado:</strong> Certificación registrada
+        </div>`;
+    } else {
+      detalle.innerHTML = `
+        <div class="hash-titulo" style="color:#b42318">✗ Este PDF NO coincide con ninguna certificación registrada</div>
+        <div class="hash-nota">El documento seleccionado no coincide exactamente con ningún registro almacenado.</div>`;
+    }
+  } catch(err) {
+    console.error(err);
+    detalle.innerHTML = `
+      <div class="hash-titulo" style="color:#b42318">No se pudo verificar el PDF</div>
+      <div class="hash-nota">${escapeHtml(err.message || "Error desconocido")}</div>`;
+  }
+});
+
+async function cargarHistorial() {
+  const contenedor = $("historialLista");
+  contenedor.innerHTML = '<div class="empty">Cargando historial…</div>';
+
+  try {
+    const snap = await getDocs(collection(db,"certificaciones"));
+
+    const registros = snap.docs.map(d => ({...d.data(), id:d.id}));
+
+    registros.sort((a,b) => {
+      const sa = a.creadoEn?.seconds || 0;
+      const sb = b.creadoEn?.seconds || 0;
+      return sb - sa;
+    });
+
+    if (!registros.length) {
+      contenedor.innerHTML = '<div class="empty">Aún no hay certificaciones registradas.</div>';
+      return;
+    }
+
+    contenedor.innerHTML = registros.map(r => `
+      <div class="history-item">
+        <div class="history-id">${escapeHtml(r.id)}</div>
+        <div>
+          <div class="history-file">${escapeHtml(r.archivoOriginal || "Documento PDF")}</div>
+          <div class="history-meta">${escapeHtml(r.fecha || "")} ${escapeHtml(r.hora || "")} · ${escapeHtml((r.paginasCertificadas || []).length)} página(s)</div>
+        </div>
+        <div class="history-cert">
+          <strong>${escapeHtml(r.certificadorNombre || "")}</strong><br>
+          <span>${escapeHtml(r.certificadorEmail || "")}</span>
+        </div>
+      </div>
+    `).join("");
+  } catch(err) {
+    console.error(err);
+    contenedor.innerHTML =
+      `<div class="empty">No se pudo cargar el historial: ${escapeHtml(err.message || "")}</div>`;
+  }
+}
+
+function mostrarPagina(nombre) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+
+  const page = document.getElementById("page-" + nombre);
+  const nav = document.querySelector(`.nav-btn[data-page="${nombre}"]`);
+
+  if (page) page.classList.add("active");
+  if (nav) nav.classList.add("active");
+
+  if (nombre === "historial") cargarHistorial();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => mostrarPagina(btn.dataset.page));
+});
+
+document.querySelectorAll("[data-go]").forEach(btn => {
+  btn.addEventListener("click", () => mostrarPagina(btn.dataset.go));
+});
+
+$("btnActualizarHistorial").addEventListener("click", cargarHistorial);
+
+async function cargarPerfil(user) {
+  const autorizado = USUARIOS_AUTORIZADOS[user.uid];
+
+  if (!autorizado || user.email?.toLowerCase() !== autorizado.correo.toLowerCase()) {
+    throw new Error("Esta cuenta no está autorizada para utilizar SAMICERT.");
+  }
+
+  const snap = await getDoc(doc(db,"usuarios",user.uid));
+
+  if (!snap.exists()) {
+    await setDoc(doc(db,"usuarios",user.uid),{
+      uid:user.uid,
+      nombre:autorizado.nombre,
+      correo:autorizado.correo,
+      creadoEn:serverTimestamp()
+    });
+    perfilActual = {
+      uid:user.uid,
+      nombre:autorizado.nombre,
+      correo:autorizado.correo
+    };
+  } else {
+    perfilActual = {
+      ...snap.data(),
+      uid:user.uid,
+      nombre:autorizado.nombre,
+      correo:autorizado.correo
+    };
+  }
+
+  $("usuarioNombre").textContent = autorizado.nombre;
+  $("usuarioEmail").textContent = autorizado.correo;
+}
+
+loginForm.addEventListener("submit",async e => {
+  e.preventDefault();
+
+  loginError.classList.add("oculto");
+  btnLogin.disabled = true;
+  btnLogin.textContent = "Ingresando…";
+
+  try {
+    await signInWithEmailAndPassword(
+      auth,
+      $("loginEmail").value.trim(),
+      $("loginPassword").value
+    );
+  } catch(err) {
+    console.error(err);
+    loginError.textContent =
+      "Correo o contraseña incorrectos, o cuenta no autorizada.";
+    loginError.classList.remove("oculto");
+  } finally {
+    btnLogin.disabled = false;
+    btnLogin.textContent = "Ingresar";
+  }
+});
+
+btnCerrarSesion.addEventListener("click", async () => {
+  resetearEstadoSesion();
+  try {
+    await signOut(auth);
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+onAuthStateChanged(auth,async user => {
+  usuarioActual = user;
+
+  if (!user) {
+    resetearEstadoSesion();
+    loginScreen.classList.remove("oculto");
+    appScreen.classList.add("oculto");
+    return;
+  }
+
+  try {
+    await cargarPerfil(user);
+    await cargarSelloAutomatico();
+
+    loginScreen.classList.add("oculto");
+    appScreen.classList.remove("oculto");
+    mostrarPagina("inicio");
+  } catch(err) {
+    console.error(err);
+    resetearEstadoSesion();
+    await signOut(auth);
+    loginError.textContent = err.message || "La cuenta no está autorizada.";
+    loginError.classList.remove("oculto");
+  }
+});
+
+renderLista();
+</script>
+</body>
+</html>
