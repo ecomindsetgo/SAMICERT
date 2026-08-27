@@ -203,6 +203,7 @@ async function cargarVisorPaginas(file) {
     );
     // Se reinician las rotaciones al cargar un PDF nuevo.
     rotacionesPagina = new Map();
+    canvasesPorPagina = new Map();
     visor.innerHTML = "";
 
     // Sirve tanto para documentos de 1 página como de varios cientos:
@@ -231,8 +232,8 @@ async function cargarVisorPaginas(file) {
       rotar.type = "button";
       rotar.className = "visor-rotar";
       rotar.innerHTML = "↻";
-      rotar.title = "Rotar página 90° en el PDF final";
-      rotar.setAttribute("aria-label", `Rotar página ${numero} en el PDF final`);
+      rotar.title = "Rotar página 90° — el giro queda guardado y se aplicará al PDF final (el archivo original no se modifica)";
+      rotar.setAttribute("aria-label", `Rotar página ${numero} para el PDF final`);
 
       const meta = document.createElement("div");
       meta.className = "pagina-meta";
@@ -245,43 +246,39 @@ async function cargarVisorPaginas(file) {
       estadoEl.className = "pagina-estado";
       estadoEl.textContent = "Certificar";
 
+      const giroEl = document.createElement("span");
+      giroEl.className = "pagina-giro oculto";
+      giroEl.title = "Esta rotación se guardará en el PDF final";
+
       const check = document.createElement("input");
       check.type = "checkbox";
       check.className = "pagina-check";
       check.checked = true;
       check.setAttribute("aria-label", `Certificar página ${numero}`);
 
-      meta.append(numeroEl, estadoEl);
+      meta.append(numeroEl, giroEl, estadoEl);
 
       // Una página individual dañada o demasiado pesada de renderizar no debe
       // tumbar la vista previa completa, sobre todo en PDFs de muchas páginas:
       // esa página se sigue pudiendo certificar, solo que sin miniatura.
       try {
         const pagina = await pdfVista.getPage(numero);
-        const baseViewport = pagina.getViewport({scale:1});
-        const escala = 138 / baseViewport.width;
-        const viewport = pagina.getViewport({scale:escala});
-
         const canvas = document.createElement("canvas");
-        canvas.width = Math.ceil(viewport.width);
-        canvas.height = Math.ceil(viewport.height);
 
         lupa.addEventListener("click", e => {
           e.stopPropagation();
           abrirVistaAmpliada(numero);
         });
-        rotar.addEventListener("click", e => {
+        rotar.addEventListener("click", async e => {
           e.stopPropagation();
-          rotarPaginaParaSalida(numero);
+          await rotarPaginaParaSalida(numero);
         });
         controles.append(lupa, rotar);
         card.append(controles, canvas, meta, check);
         visor.appendChild(card);
+        canvasesPorPagina.set(numero, canvas);
 
-        await pagina.render({
-          canvasContext:canvas.getContext("2d"),
-          viewport
-        }).promise;
+        await renderMiniaturaPagina(numero);
       } catch (errorPagina) {
         console.error(`No se pudo previsualizar la página ${numero}:`, errorPagina);
 
@@ -339,8 +336,58 @@ async function cargarVisorPaginas(file) {
 let visorModalPaginaActual = null;
 let visorModalZoom = 1;
 let visorModalRotacionExtra = 0;
-// Rotación elegida por el usuario para el PDF FINAL. No modifica el archivo original.
+// Rotación elegida por el usuario para el PDF FINAL. Esto NUNCA toca el
+// archivo original: solo se guarda en memoria y se aplica al generar el
+// PDF nuevo en aplicarSelloAUnPdf(). El archivo que el usuario subió no
+// se reescribe ni se altera en ningún momento.
 let rotacionesPagina = new Map();
+// Referencia al <canvas> miniatura de cada página, para poder repintarlo
+// ya rotado apenas el usuario gira la página (sin depender del modal).
+let canvasesPorPagina = new Map();
+
+// Dibuja la miniatura de una página reflejando SIEMPRE la rotación ya
+// aplicada (la propia del PDF + la que el usuario haya elegido con ↻),
+// para que la tarjeta muestre de forma permanente cómo quedará esa
+// página en el PDF final, y no solo dentro del visor ampliado.
+async function renderMiniaturaPagina(numero) {
+  const canvas = canvasesPorPagina.get(numero);
+  if (!pdfVista || !canvas) return;
+
+  const pagina = await pdfVista.getPage(numero);
+  const rotacionExtra = Number(rotacionesPagina.get(numero) || 0);
+  const rotacionTotal = (normalizarRotacionPdfJs(pagina) + rotacionExtra) % 360;
+
+  const baseViewport = pagina.getViewport({scale:1, rotation:rotacionTotal});
+  const escala = 138 / baseViewport.width;
+  const viewport = pagina.getViewport({scale:escala, rotation:rotacionTotal});
+
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+
+  await pagina.render({
+    canvasContext: canvas.getContext("2d"),
+    viewport
+  }).promise;
+}
+
+function actualizarBadgeGiro(numero) {
+  const card = visorPaginas().querySelector(`.pagina-card[data-page="${numero}"]`);
+  if (!card) return;
+  const giroEl = card.querySelector(".pagina-giro");
+  if (!giroEl) return;
+  const giro = Number(rotacionesPagina.get(numero) || 0);
+  if (giro) {
+    giroEl.textContent = `↻ ${giro}°`;
+    giroEl.classList.remove("oculto");
+  } else {
+    giroEl.textContent = "";
+    giroEl.classList.add("oculto");
+  }
+}
+
+function visorPaginas() {
+  return $("visorPaginas");
+}
 
 async function abrirVistaAmpliada(numero) {
   if (!pdfVista) return;
@@ -372,14 +419,20 @@ function normalizarRotacionPdfJs(pagina) {
 
 async function rotarVistaModal() {
   if (!pdfVista || !visorModalPaginaActual) return;
+  const numero = visorModalPaginaActual;
   rotacionesPagina.set(
-    visorModalPaginaActual,
-    (Number(rotacionesPagina.get(visorModalPaginaActual) || 0) + 90) % 360
+    numero,
+    (Number(rotacionesPagina.get(numero) || 0) + 90) % 360
   );
-  visorModalRotacionExtra = Number(rotacionesPagina.get(visorModalPaginaActual) || 0);
-  const pagina = await pdfVista.getPage(visorModalPaginaActual);
+  visorModalRotacionExtra = Number(rotacionesPagina.get(numero) || 0);
+  const pagina = await pdfVista.getPage(numero);
   await renderPaginaModal(pagina);
-  actualizarIndicadorRotacion(visorModalPaginaActual);
+  actualizarIndicadorRotacion(numero);
+
+  // El giro elegido aquí es el mismo que se aplicará al PDF final:
+  // se refleja también en la miniatura de la tarjeta correspondiente.
+  await renderMiniaturaPagina(numero);
+  actualizarBadgeGiro(numero);
 }
 
 function actualizarIndicadorRotacion(numero) {
@@ -388,10 +441,23 @@ function actualizarIndicadorRotacion(numero) {
   if (titulo) titulo.textContent = `Página ${numero} — vista ampliada${giro ? ` — giro adicional: ${giro}°` : ""}`;
 }
 
-function rotarPaginaParaSalida(numero) {
+// Rotar desde la tarjeta: el giro se guarda de inmediato para el PDF final
+// (se ve reflejado en la miniatura ahí mismo, sin necesidad de abrir la
+// vista ampliada) y el archivo original que se subió no se toca en nada.
+async function rotarPaginaParaSalida(numero) {
   const giro = (Number(rotacionesPagina.get(numero) || 0) + 90) % 360;
   rotacionesPagina.set(numero, giro);
-  abrirVistaAmpliada(numero);
+  await renderMiniaturaPagina(numero);
+  actualizarBadgeGiro(numero);
+
+  // Si la vista ampliada de esta misma página está abierta, se mantiene
+  // sincronizada con el nuevo giro.
+  if (!$("visorModal").classList.contains("oculto") && visorModalPaginaActual === numero) {
+    visorModalRotacionExtra = giro;
+    const pagina = await pdfVista.getPage(numero);
+    await renderPaginaModal(pagina);
+    actualizarIndicadorRotacion(numero);
+  }
 }
 
 async function renderPaginaModal(pagina) {

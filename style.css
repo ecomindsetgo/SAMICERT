@@ -294,8 +294,9 @@ button{cursor:pointer}
 .pagina-card.no-seleccionada{opacity:.58}
 .pagina-card canvas{display:block;width:100%;height:auto;background:#fff;border:1px solid #e8edf2}
 .pagina-error{display:flex;align-items:center;justify-content:center;min-height:90px;width:100%;background:#fff7f5;border:1px dashed #b42318;border-radius:6px;color:#b42318;font-size:12px;font-weight:700;text-align:center;padding:8px}
-.pagina-meta{display:flex;justify-content:space-between;gap:7px;margin-top:7px;font-size:10.5px}
+.pagina-meta{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-top:7px;font-size:10.5px}
 .pagina-numero{font-weight:800}
+.pagina-giro{color:#b45309;font-weight:800;background:#fff7e6;border:1px solid #f3d39a;border-radius:10px;padding:1px 6px}
 .pagina-estado{color:var(--blue);font-weight:800}
 .pagina-card.no-seleccionada .pagina-estado{color:#64748b}
 .pagina-check{position:absolute;top:10px;right:10px;width:20px;height:20px;accent-color:var(--blue)}
