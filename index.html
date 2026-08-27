@@ -160,7 +160,6 @@
             <div class="icono">📄</div>
             <div class="txt1">Haz clic para seleccionar el PDF que deseas certificar</div>
             <div class="txt2">También puedes arrastrar y soltar un archivo PDF aquí</div>
-            <input type="file" id="inputPdf" accept="application/pdf" class="oculto">
           </div>
 
           <div class="lista oculto" id="lista"></div>
@@ -189,8 +188,7 @@
                 <span class="visor-modal-btn" id="visorZoomTexto">100%</span>
                 <button type="button" class="visor-modal-btn" id="btnZoomMas">+</button>
                 <button type="button" class="visor-modal-btn" id="btnZoomAjustar">Ajustar</button>
-                <!-- BOTÓN DE ROTACIÓN EN EL MODAL -->
-                <button type="button" class="visor-modal-btn" id="btnRotarModal" title="Rotar 90°">🔄</button>
+                <button type="button" class="visor-modal-btn" id="btnRotarModal">↻ Rotar</button>
                 <button type="button" class="visor-modal-btn visor-modal-cerrar" id="btnCerrarVisorModal" aria-label="Cerrar">✕</button>
               </div>
             </div>
@@ -215,26 +213,227 @@
 
       <!-- VERIFICAR -->
       <section class="page" id="page-verificar">
-        <!-- ... (mantén tu contenido original de verificar) ... -->
+        <div class="section-head">
+          <h2>Verificar Documento</h2>
+          <p>Compruebe si el PDF corresponde exactamente a una certificación registrada en SAMICERT.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Verificar SHA-256 de un PDF</div>
+          <div class="panel-subtitle" style="margin-bottom:13px">
+            Seleccione el PDF certificado. SAMICERT calculará automáticamente su huella SHA-256 y realizará automáticamente la consulta del registro. La huella no se muestra para copiar.
+          </div>
+          <div class="verify-upload">
+            <input type="file" id="inputVerificarPdf" accept="application/pdf,.pdf">
+            <div id="archivoVerificacionNombre" class="verify-file-name oculto"></div>
+          </div>
+
+          <div id="hashVerificado" class="hash-resultado oculto">
+            <div id="coincidenciaHash"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Consultar certificado por identificador</div>
+          <div class="panel-subtitle" style="margin-bottom:13px">Ingrese el identificador de certificación registrado en el documento.</div>
+          <div class="query-row">
+            <input type="text" id="inputConsultaId" placeholder="CERT-2026-XXXXXXXXXXXX">
+            <button type="button" class="btn-primary" id="btnConsultar">Buscar</button>
+          </div>
+
+          <div id="resultadoConsulta" class="hash-resultado oculto">
+            <div class="hash-titulo">Certificado encontrado</div>
+            <div id="detalleConsulta" class="result-detail"></div>
+          </div>
+
+          <div id="noEncontradoConsulta" class="hash-resultado oculto" style="border-left-color:#b42318;background:#fff7f5">
+            <div class="hash-titulo" style="color:#b42318">No se encontró ese certificado</div>
+            <div class="hash-nota">Verifique el identificador ingresado.</div>
+          </div>
+        </div>
       </section>
 
       <!-- HISTORIAL -->
       <section class="page" id="page-historial">
-        <!-- ... (mantén tu contenido original de historial) ... -->
+        <div class="section-head">
+          <h2>Historial de Certificaciones</h2>
+          <p>Registro centralizado de las certificaciones realizadas por los dos usuarios autorizados.</p>
+        </div>
+
+        <div class="panel">
+          <div class="history-toolbar">
+            <div class="panel-title" style="margin:0">Certificaciones registradas</div>
+            <button class="btn-small" id="btnActualizarHistorial">Actualizar</button>
+          </div>
+
+          <div class="history-filtros">
+            <input type="text" id="histBuscar" placeholder="Buscar por archivo, certificador o ID…">
+            <select id="histCertificador">
+              <option value="">Todos los certificadores</option>
+            </select>
+            <div class="history-filtro-fechas">
+              <label for="histDesde">Desde</label>
+              <input type="date" id="histDesde">
+              <label for="histHasta">Hasta</label>
+              <input type="date" id="histHasta">
+            </div>
+            <button type="button" class="btn-small" id="btnLimpiarFiltrosHistorial">Limpiar filtros</button>
+            <div class="history-porpagina">
+              <label for="histPorPagina">Por página</label>
+              <select id="histPorPagina">
+                <option value="12">12</option>
+                <option value="15">15</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="history-resumen">
+            <span id="histResumenConteo">0 registro(s)</span>
+            <span class="history-resumen-folios">Total de folios/páginas certificadas: <strong id="histTotalFolios">0</strong></span>
+          </div>
+
+          <div id="historialLista" class="history-list">
+            <div class="empty">Cargando historial…</div>
+          </div>
+
+          <div id="historialPaginacion" class="history-paginacion oculto">
+            <button type="button" class="btn-small" id="btnHistPaginaAnterior">‹ Anterior</button>
+            <span id="histPaginaIndicador">Página 1 de 1</span>
+            <button type="button" class="btn-small" id="btnHistPaginaSiguiente">Siguiente ›</button>
+          </div>
+        </div>
       </section>
 
+      <!-- ACERCA -->
       <!-- ADMINISTRACIÓN -->
       <section class="page" id="page-administracion">
-        <!-- ... (mantén tu contenido original de administración) ... -->
+        <div class="section-head">
+          <h2>Administración de SAMICERT</h2>
+          <p>Funciones reservadas exclusivamente al usuario administrador.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Respaldo de registros</div>
+          <div class="panel-subtitle">
+            Genera un respaldo JSON de las certificaciones registradas en Firestore. Incluye metadatos, SHA-256,
+            certificador, fecha, hora y páginas certificadas.
+          </div>
+          <div class="backup-card">
+            <strong>Importante:</strong> la versión actual de SAMICERT no almacena los PDF certificados dentro de Firebase;
+            los archivos se descargan en el equipo del certificador. Por ello, este respaldo protege el registro de certificaciones,
+            no los archivos PDF.
+          </div>
+          <div class="admin-toolbar">
+            <button class="btn-green" id="btnCrearBackup">Generar respaldo</button>
+            <span class="admin-status" id="backupStatus"></span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title admin-danger">Limpieza de datos de prueba</div>
+          <div class="panel-subtitle">
+            Seleccione registros que correspondan a pruebas o errores y elimínelos. Esta operación es irreversible desde la aplicación.
+          </div>
+          <div class="admin-note">
+            <strong>Recomendación:</strong> genere un respaldo antes de eliminar información.
+            Las reglas de Firebase impiden que los certificadores eliminen registros.
+          </div>
+          <div class="admin-toolbar">
+            <button class="btn-small" id="btnSeleccionarTodosAdmin">Seleccionar todos</button>
+            <button class="btn-small" id="btnDeseleccionarTodosAdmin">Deseleccionar todos</button>
+            <button class="btn-danger" id="btnEliminarSeleccionados" disabled>Eliminar seleccionados</button>
+            <span class="admin-status" id="adminStatus"></span>
+          </div>
+          <div id="adminLista" class="history-list">
+            <div class="empty">Cargando registros…</div>
+          </div>
+        </div>
       </section>
 
       <!-- SEGURIDAD -->
       <section class="page" id="page-seguridad">
-        <!-- ... (mantén tu contenido original de seguridad) ... -->
+        <div class="section-head">
+          <h2>Seguridad de la cuenta</h2>
+          <p>Actualice la contraseña de acceso a SAMICERT.</p>
+        </div>
+
+        <div class="panel password-panel">
+          <div class="panel-title">Cambiar contraseña</div>
+          <div class="panel-subtitle">
+            Por seguridad, debe ingresar su contraseña actual antes de establecer una nueva.
+          </div>
+
+          <form id="passwordForm" class="password-form" autocomplete="off">
+            <div class="password-help">
+              La nueva contraseña debe tener como mínimo <strong>8 caracteres</strong>. 
+              Se recomienda combinar mayúsculas, minúsculas, números y símbolos.
+            </div>
+
+            <div class="field">
+              <label for="currentPassword">Contraseña actual</label>
+              <input id="currentPassword" type="password" autocomplete="current-password"
+                     minlength="6" required>
+            </div>
+
+            <div class="field">
+              <label for="newPassword">Nueva contraseña</label>
+              <input id="newPassword" type="password" autocomplete="new-password"
+                     minlength="8" required>
+            </div>
+
+            <div class="field">
+              <label for="confirmPassword">Confirmar nueva contraseña</label>
+              <input id="confirmPassword" type="password" autocomplete="new-password"
+                     minlength="8" required>
+            </div>
+
+            <div class="password-actions">
+              <button class="btn-primary" id="btnGuardarPassword" type="submit">
+                Actualizar contraseña
+              </button>
+              <button class="btn-gray" id="btnLimpiarPassword" type="button">
+                Limpiar
+              </button>
+            </div>
+
+            <div id="passwordMessage" class="password-message oculto"></div>
+          </form>
+        </div>
       </section>
 
       <section class="page" id="page-acerca">
-        <!-- ... (mantén tu contenido original de acerca) ... -->
+        <div class="section-head">
+          <h2>Acerca de SAMICERT</h2>
+          <p>Sistema de Archivo y Manejo de Información para la Certificación de Documentos.</p>
+        </div>
+
+        <div class="panel">
+          <div class="about-grid">
+            <div class="about-box">
+              <h3>Finalidad</h3>
+              <p>SAMICERT permite certificar documentos PDF aplicando automáticamente el sello correspondiente al usuario autenticado y registrar la certificación para su posterior verificación.</p>
+            </div>
+            <div class="about-box">
+              <h3>Certificadores autorizados</h3>
+              <ul>
+                <li>Jorge Luis Desposorio Castillo — jdesposorio@pj.gob.pe</li>
+                <li>Roberto Alexander Dávila Arquiñigo — rdavilaaa@pj.gob.pe</li>
+              </ul>
+            </div>
+            <div class="about-box">
+              <h3>Integridad documental</h3>
+              <p>El sistema calcula el SHA-256 sobre los bytes exactos del PDF final después de aplicar el sello. Esa huella queda registrada automáticamente en Firestore.</p>
+            </div>
+            <div class="about-box">
+              <h3>Seguridad</h3>
+              <p>El acceso requiere autenticación. Las certificaciones registradas están protegidas para impedir modificaciones o eliminaciones desde la aplicación.</p>
+            </div>
+            <div class="about-box">
+              <h3>Autor del sistema</h3>
+              <p><strong>Alfredo Raúl Cruzado Palacios</strong><br>Diseño y desarrollo de SAMICERT.</p>
+            </div>
+          </div>
+        </div>
       </section>
 
       <footer>

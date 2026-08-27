@@ -309,7 +309,11 @@ button{cursor:pointer}
   display:flex;align-items:center;justify-content:center;cursor:zoom-in;
   font-size:16px;box-shadow:0 2px 6px rgba(15,23,42,.12);z-index:3;
 }
-.visor-lupa:hover{background:#f1f6ff;border-color:#1769d2;transform:scale(1.05)}
+.visor-lupa:hover{background:#f1f6ff;border-color:#1769d2;transform:scale(1.05)}.visor-controles{position:absolute;left:10px;top:10px;display:flex;gap:5px;z-index:3}
+.visor-controles button{position:static!important}
+.visor-rotar{width:30px;height:30px;border:1px solid #d5dde7;background:#fff;color:#1769d2;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;box-shadow:0 2px 6px rgba(15,23,42,.12)}
+.visor-rotar:hover{background:#f1f6ff;border-color:#1769d2;transform:scale(1.05)}
+.visor-rotar:disabled{opacity:.5;cursor:not-allowed}
 .visor-modal{
   position:fixed;inset:0;background:rgba(15,23,42,.82);z-index:9999;
   display:flex;flex-direction:column;padding:18px;
