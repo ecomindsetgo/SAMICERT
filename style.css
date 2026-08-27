@@ -294,9 +294,9 @@ button{cursor:pointer}
 .pagina-card.no-seleccionada{opacity:.58}
 .pagina-card canvas{display:block;width:100%;height:auto;background:#fff;border:1px solid #e8edf2}
 .pagina-error{display:flex;align-items:center;justify-content:center;min-height:90px;width:100%;background:#fff7f5;border:1px dashed #b42318;border-radius:6px;color:#b42318;font-size:12px;font-weight:700;text-align:center;padding:8px}
-.pagina-meta{display:flex;justify-content:space-between;gap:7px;margin-top:7px;font-size:10.5px}
+.pagina-meta{display:flex;justify-content:space-between;gap:5px;margin-top:7px;font-size:10.5px;align-items:center;flex-wrap:wrap}
 .pagina-numero{font-weight:800}
-.pagina-estado{color:var(--blue);font-weight:800}
+.pagina-estado{color:var(--blue);font-weight:800}.pagina-rotacion{color:#7c3aed;font-weight:800;margin-left:auto}
 .pagina-card.no-seleccionada .pagina-estado{color:#64748b}
 .pagina-check{position:absolute;top:10px;right:10px;width:20px;height:20px;accent-color:var(--blue)}
 .visor-cargando{grid-column:1/-1;padding:25px;text-align:center;color:var(--muted);font-size:12px}
@@ -309,11 +309,7 @@ button{cursor:pointer}
   display:flex;align-items:center;justify-content:center;cursor:zoom-in;
   font-size:16px;box-shadow:0 2px 6px rgba(15,23,42,.12);z-index:3;
 }
-.visor-lupa:hover{background:#f1f6ff;border-color:#1769d2;transform:scale(1.05)}.visor-controles{position:absolute;left:10px;top:10px;display:flex;gap:5px;z-index:3}
-.visor-controles button{position:static!important}
-.visor-rotar{width:30px;height:30px;border:1px solid #d5dde7;background:#fff;color:#1769d2;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;box-shadow:0 2px 6px rgba(15,23,42,.12)}
-.visor-rotar:hover{background:#f1f6ff;border-color:#1769d2;transform:scale(1.05)}
-.visor-rotar:disabled{opacity:.5;cursor:not-allowed}
+.visor-lupa:hover{background:#f1f6ff;border-color:#1769d2;transform:scale(1.05)}
 .visor-modal{
   position:fixed;inset:0;background:rgba(15,23,42,.82);z-index:9999;
   display:flex;flex-direction:column;padding:18px;

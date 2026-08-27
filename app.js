@@ -48,6 +48,7 @@ let pdfVista = null;
 let usuarioActual = null;
 let perfilActual = null;
 let selloBytes = null;
+let rotacionesPagina = new Map(); // giro adicional elegido por el usuario para el PDF FINAL
 
 const TAMANO_SELLO_PT = 90;
 const MARGEN_SELLO_PT = 3;
@@ -201,8 +202,6 @@ async function cargarVisorPaginas(file) {
     paginasSeleccionadas = new Set(
       Array.from({length:totalPaginas}, (_,i) => i + 1)
     );
-    // Se reinician las rotaciones al cargar un PDF nuevo.
-    rotacionesPagina = new Map();
     visor.innerHTML = "";
 
     // Sirve tanto para documentos de 1 página como de varios cientos:
@@ -217,9 +216,6 @@ async function cargarVisorPaginas(file) {
       card.className = "pagina-card seleccionada";
       card.dataset.page = String(numero);
 
-      const controles = document.createElement("div");
-      controles.className = "visor-controles";
-
       const lupa = document.createElement("button");
       lupa.type = "button";
       lupa.className = "visor-lupa";
@@ -231,8 +227,12 @@ async function cargarVisorPaginas(file) {
       rotar.type = "button";
       rotar.className = "visor-rotar";
       rotar.innerHTML = "↻";
-      rotar.title = "Rotar página 90° en el PDF final";
-      rotar.setAttribute("aria-label", `Rotar página ${numero} en el PDF final`);
+      rotar.title = "Rotar esta página 90° y conservar la rotación en el PDF firmado";
+      rotar.setAttribute("aria-label", `Rotar página ${numero}`);
+
+      const controles = document.createElement("div");
+      controles.className = "visor-controles";
+      controles.append(lupa, rotar);
 
       const meta = document.createElement("div");
       meta.className = "pagina-meta";
@@ -244,6 +244,9 @@ async function cargarVisorPaginas(file) {
       const estadoEl = document.createElement("span");
       estadoEl.className = "pagina-estado";
       estadoEl.textContent = "Certificar";
+      const rotacionEl = document.createElement("span");
+      rotacionEl.className = "pagina-rotacion";
+      rotacionEl.textContent = "";
 
       const check = document.createElement("input");
       check.type = "checkbox";
@@ -251,16 +254,15 @@ async function cargarVisorPaginas(file) {
       check.checked = true;
       check.setAttribute("aria-label", `Certificar página ${numero}`);
 
-      meta.append(numeroEl, estadoEl);
-
       // Una página individual dañada o demasiado pesada de renderizar no debe
       // tumbar la vista previa completa, sobre todo en PDFs de muchas páginas:
       // esa página se sigue pudiendo certificar, solo que sin miniatura.
       try {
         const pagina = await pdfVista.getPage(numero);
-        const baseViewport = pagina.getViewport({scale:1});
+        const rotacionFinalVista = (Number(pagina.rotate || 0) + Number(rotacionesPagina.get(numero) || 0)) % 360;
+        const baseViewport = pagina.getViewport({scale:1, rotation:rotacionFinalVista});
         const escala = 138 / baseViewport.width;
-        const viewport = pagina.getViewport({scale:escala});
+        const viewport = pagina.getViewport({scale:escala, rotation:rotacionFinalVista});
 
         const canvas = document.createElement("canvas");
         canvas.width = Math.ceil(viewport.width);
@@ -270,11 +272,12 @@ async function cargarVisorPaginas(file) {
           e.stopPropagation();
           abrirVistaAmpliada(numero);
         });
-        rotar.addEventListener("click", e => {
+        rotar.addEventListener("click", async e => {
           e.stopPropagation();
-          rotarPaginaParaSalida(numero);
+          try { await rotarPaginaParaSalida(numero); } catch (err) { console.error(err); alert("No se pudo rotar la página."); }
         });
-        controles.append(lupa, rotar);
+
+        meta.append(numeroEl, estadoEl, rotacionEl);
         card.append(controles, canvas, meta, check);
         visor.appendChild(card);
 
@@ -294,7 +297,7 @@ async function cargarVisorPaginas(file) {
         lupa.title = "Vista ampliada no disponible para esta página.";
         rotar.disabled = true;
         rotar.title = "Rotación no disponible para esta página.";
-        controles.append(lupa, rotar);
+        meta.append(numeroEl, estadoEl, rotacionEl);
         card.append(controles, aviso, meta, check);
         visor.appendChild(card);
       }
@@ -338,26 +341,49 @@ async function cargarVisorPaginas(file) {
 
 let visorModalPaginaActual = null;
 let visorModalZoom = 1;
-let visorModalRotacionExtra = 0;
-// Rotación elegida por el usuario para el PDF FINAL. No modifica el archivo original.
-let rotacionesPagina = new Map();
+
+function rotacionOriginalPagina(pagina) {
+  return ((Number(pagina.rotate || 0) % 360) + 360) % 360;
+}
+
+function rotacionFinalPagina(numero, pagina) {
+  const original = pagina ? rotacionOriginalPagina(pagina) : 0;
+  const extra = Number(rotacionesPagina.get(numero) || 0);
+  return (original + extra) % 360;
+}
+
+async function renderMiniatura(numero) {
+  if (!pdfVista) return;
+  const card = document.querySelector(`.pagina-card[data-page="${numero}"]`);
+  if (!card) return;
+  const canvas = card.querySelector('canvas');
+  if (!canvas) return;
+  const pagina = await pdfVista.getPage(numero);
+  const rot = rotacionFinalPagina(numero, pagina);
+  const baseViewport = pagina.getViewport({scale:1, rotation:rot});
+  const escala = 138 / baseViewport.width;
+  const viewport = pagina.getViewport({scale:escala, rotation:rot});
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  await pagina.render({canvasContext:canvas.getContext('2d'), viewport}).promise;
+  const estado = card.querySelector('.pagina-rotacion');
+  if (estado) estado.textContent = rot ? `↻ ${rot}°` : '';
+}
 
 async function abrirVistaAmpliada(numero) {
   if (!pdfVista) return;
   try {
     visorModalPaginaActual = numero;
-    visorModalRotacionExtra = Number(rotacionesPagina.get(numero) || 0);
     const pagina = await pdfVista.getPage(numero);
-    const baseViewport = pagina.getViewport({scale:1});
-    const area = $("visorModalArea");
-    const canvas = $("visorModalCanvas");
+    const rot = rotacionFinalPagina(numero, pagina);
+    const baseViewport = pagina.getViewport({scale:1, rotation:rot});
+    const area = $('visorModalArea');
     const anchoDisponible = Math.max(350, area.clientWidth - 70);
-    // Al abrir, la página se ajusta al ancho disponible; luego el usuario puede ampliar.
-    visorModalZoom = Math.max(0.8, Math.min(1.5, anchoDisponible / baseViewport.width));
+    visorModalZoom = Math.max(0.5, Math.min(1.5, anchoDisponible / baseViewport.width));
     await renderPaginaModal(pagina);
-    $("visorModalTitulo").textContent = `Página ${numero} — vista ampliada`;
-    $("visorModal").classList.remove("oculto");
-    document.body.style.overflow = "hidden";
+    actualizarIndicadorRotacion(numero, rot);
+    $('visorModal').classList.remove('oculto');
+    document.body.style.overflow = 'hidden';
   } catch (error) {
     console.error(error);
     visorModalPaginaActual = null;
@@ -365,49 +391,16 @@ async function abrirVistaAmpliada(numero) {
   }
 }
 
-function normalizarRotacionPdfJs(pagina) {
-  const angulo = Number(pagina.rotate || 0);
-  return ((angulo % 360) + 360) % 360;
-}
-
-async function rotarVistaModal() {
-  if (!pdfVista || !visorModalPaginaActual) return;
-  rotacionesPagina.set(
-    visorModalPaginaActual,
-    (Number(rotacionesPagina.get(visorModalPaginaActual) || 0) + 90) % 360
-  );
-  visorModalRotacionExtra = Number(rotacionesPagina.get(visorModalPaginaActual) || 0);
-  const pagina = await pdfVista.getPage(visorModalPaginaActual);
-  await renderPaginaModal(pagina);
-  actualizarIndicadorRotacion(visorModalPaginaActual);
-}
-
-function actualizarIndicadorRotacion(numero) {
-  const giro = Number(rotacionesPagina.get(numero) || 0);
-  const titulo = $("visorModalTitulo");
-  if (titulo) titulo.textContent = `Página ${numero} — vista ampliada${giro ? ` — giro adicional: ${giro}°` : ""}`;
-}
-
-function rotarPaginaParaSalida(numero) {
-  const giro = (Number(rotacionesPagina.get(numero) || 0) + 90) % 360;
-  rotacionesPagina.set(numero, giro);
-  abrirVistaAmpliada(numero);
-}
-
 async function renderPaginaModal(pagina) {
-  const canvas = $("visorModalCanvas");
-  const escala = visorModalZoom;
-  const rotacionBase = normalizarRotacionPdfJs(pagina);
-  const viewport = pagina.getViewport({scale:escala, rotation:rotacionBase + visorModalRotacionExtra});
+  const canvas = $('visorModalCanvas');
+  const rot = rotacionFinalPagina(visorModalPaginaActual, pagina);
+  const viewport = pagina.getViewport({scale:visorModalZoom, rotation:rot});
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
   canvas.style.width = `${Math.ceil(viewport.width)}px`;
   canvas.style.height = `${Math.ceil(viewport.height)}px`;
-  $("visorZoomTexto").textContent = `${Math.round(escala * 100)}%`;
-  await pagina.render({
-    canvasContext: canvas.getContext("2d"),
-    viewport
-  }).promise;
+  $('visorZoomTexto').textContent = `${Math.round(visorModalZoom * 100)}%`;
+  await pagina.render({canvasContext:canvas.getContext('2d'), viewport}).promise;
 }
 
 async function cambiarZoomModal(delta) {
@@ -415,41 +408,65 @@ async function cambiarZoomModal(delta) {
   const nuevo = Math.max(0.5, Math.min(3.5, visorModalZoom + delta));
   if (Math.abs(nuevo - visorModalZoom) < 0.001) return;
   visorModalZoom = nuevo;
-  const pagina = await pdfVista.getPage(visorModalPaginaActual);
-  await renderPaginaModal(pagina);
+  await renderPaginaModal(await pdfVista.getPage(visorModalPaginaActual));
 }
 
 async function ajustarZoomModal() {
   if (!pdfVista || !visorModalPaginaActual) return;
   const pagina = await pdfVista.getPage(visorModalPaginaActual);
-  const baseViewport = pagina.getViewport({scale:1});
-  const area = $("visorModalArea");
-  visorModalZoom = Math.max(0.8, Math.min(1.5, (area.clientWidth - 70) / baseViewport.width));
+  const rot = rotacionFinalPagina(visorModalPaginaActual, pagina);
+  const baseViewport = pagina.getViewport({scale:1, rotation:rot});
+  const area = $('visorModalArea');
+  visorModalZoom = Math.max(0.5, Math.min(1.5, (area.clientWidth - 70) / baseViewport.width));
   await renderPaginaModal(pagina);
 }
 
-function cerrarVistaAmpliada() {
-  $("visorModal").classList.add("oculto");
-  visorModalPaginaActual = null;
-  visorModalRotacionExtra = 0;
-  document.body.style.overflow = "";
+function actualizarIndicadorRotacion(numero, rot) {
+  const titulo = $('visorModalTitulo');
+  if (titulo) titulo.textContent = `Página ${numero} — orientación ${rot}°`;
 }
 
-$("btnZoomMas").addEventListener("click", () => cambiarZoomModal(0.25));
-$("btnZoomMenos").addEventListener("click", () => cambiarZoomModal(-0.25));
-$("btnZoomAjustar").addEventListener("click", ajustarZoomModal);
-$("btnRotarModal").addEventListener("click", rotarVistaModal);
-$("btnCerrarVisorModal").addEventListener("click", cerrarVistaAmpliada);
+async function rotarPaginaParaSalida(numero) {
+  rotacionesPagina.set(numero, (Number(rotacionesPagina.get(numero) || 0) + 90) % 360);
+  await renderMiniatura(numero);
+  if (visorModalPaginaActual === numero && !$('visorModal').classList.contains('oculto')) {
+    const pagina = await pdfVista.getPage(numero);
+    await renderPaginaModal(pagina);
+    actualizarIndicadorRotacion(numero, rotacionFinalPagina(numero, pagina));
+  }
+  const estado = document.querySelector(`.pagina-card[data-page="${numero}"] .pagina-estado`);
+  if (estado) {
+    const giro = Number(rotacionesPagina.get(numero) || 0);
+    estado.textContent = giro ? `Certificar · ↻${giro}°` : 'Certificar';
+  }
+}
 
-$("visorModal").addEventListener("click", e => {
-  if (e.target === $("visorModal")) cerrarVistaAmpliada();
+async function rotarDesdeModal() {
+  if (!visorModalPaginaActual) return;
+  await rotarPaginaParaSalida(visorModalPaginaActual);
+}
+
+function cerrarVistaAmpliada() {
+  $('visorModal').classList.add('oculto');
+  visorModalPaginaActual = null;
+  document.body.style.overflow = '';
+}
+
+$('btnZoomMas').addEventListener('click', () => cambiarZoomModal(0.25));
+$('btnZoomMenos').addEventListener('click', () => cambiarZoomModal(-0.25));
+$('btnZoomAjustar').addEventListener('click', ajustarZoomModal);
+$('btnRotarModal').addEventListener('click', rotarDesdeModal);
+$('btnCerrarVisorModal').addEventListener('click', cerrarVistaAmpliada);
+
+$('visorModal').addEventListener('click', e => {
+  if (e.target === $('visorModal')) cerrarVistaAmpliada();
 });
 
-document.addEventListener("keydown", e => {
-  if ($("visorModal").classList.contains("oculto")) return;
-  if (e.key === "Escape") cerrarVistaAmpliada();
-  if (e.key === "+" || e.key === "=") cambiarZoomModal(0.25);
-  if (e.key === "-") cambiarZoomModal(-0.25);
+document.addEventListener('keydown', e => {
+  if ($('visorModal').classList.contains('oculto')) return;
+  if (e.key === 'Escape') cerrarVistaAmpliada();
+  if (e.key === '+' || e.key === '=') cambiarZoomModal(0.25);
+  if (e.key === '-') cambiarZoomModal(-0.25);
 });
 
 function resetearEstadoSesion() {
@@ -466,6 +483,7 @@ function resetearEstadoSesion() {
   paginasSeleccionadas = new Set();
   totalPaginas = 0;
   pdfVista = null;
+  rotacionesPagina = new Map();
   selloBytes = null;
   perfilActual = null;
   esAdministradorActual = false;
@@ -535,6 +553,7 @@ function limpiarArchivo() {
   paginasSeleccionadas.clear();
   totalPaginas = 0;
   pdfVista = null;
+  rotacionesPagina = new Map();
 
   $("selectorPaginas").classList.add("oculto");
   $("visorPaginas").innerHTML = "";
@@ -592,180 +611,115 @@ $("btnInvertir").onclick = () => {
   });
 };
 
+function crearImagenConInformacion(baseImage, fecha, hora, certId, giro) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const blob = new Blob([selloBytes], {type:'image/png'});
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      try {
+        const S = 945;
+        const canvas = document.createElement('canvas');
+        canvas.width = S;
+        canvas.height = S;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0,0,S,S);
+        ctx.drawImage(img,0,0,S,S);
 
-function normalizarRotacionPagina(pagina) {
-  const a = Number(pagina.getRotation()?.angle || 0);
-  return ((a % 360) + 360) % 360;
-}
+        // Información de certificación dentro del propio sello.
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ab2417';
+        ctx.font = 'bold 31px Arial';
+        ctx.fillText(fecha, S/2, 535);
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText(hora, S/2, 570);
+        ctx.font = 'bold 22px Arial';
+        ctx.fillText(certId, S/2, 605);
 
-// Convierte una posición expresada en la orientación visual FINAL de la página
-// a coordenadas PDF (origen abajo/izquierda). Esto permite que "inferior-derecha"
-// siga siendo inferior-derecha aunque la página tenga /Rotate 90/180/270.
-function centroSelloEnCoordenadasPdf(pagina, esquina, tamano, margen, rotacionFinal) {
-  const {width, height} = pagina.getSize();
-  const rot = ((Number(rotacionFinal) % 360) + 360) % 360;
-
-  const anchoVisual = (rot === 90 || rot === 270) ? height : width;
-  const altoVisual  = (rot === 90 || rot === 270) ? width : height;
-
-  const centroVisualX = esquina.includes('derecha')
-    ? anchoVisual - margen - tamano / 2
-    : margen + tamano / 2;
-  const centroVisualY = esquina.includes('inferior')
-    ? margen + tamano / 2
-    : altoVisual - margen - tamano / 2;
-
-  // Transformación inversa de la rotación de página.
-  // PDF usa coordenadas con origen abajo/izquierda.
-  if (rot === 90) {
-    return { x: width - centroVisualY, y: centroVisualX };
-  }
-  if (rot === 180) {
-    return { x: width - centroVisualX, y: height - centroVisualY };
-  }
-  if (rot === 270) {
-    return { x: centroVisualY, y: height - centroVisualX };
-  }
-  return { x: centroVisualX, y: centroVisualY };
-}
-
-// Dibuja el sello siempre derecho respecto a lo que el usuario ve.
-// No usamos una transformación adicional sobre el x/y del sello, porque eso
-// provocaba que algunos elementos quedaran fuera de la página.
-function dibujarSelloEnEsquina(pagina, imagen, esquina, tamano, margen, rotacionFinal) {
-  const centro = centroSelloEnCoordenadasPdf(
-    pagina, esquina, tamano, margen, rotacionFinal
-  );
-
-  const rot = ((Number(rotacionFinal) % 360) + 360) % 360;
-  const giroSello = rot === 90 ? -90 : rot === 180 ? -180 : rot === 270 ? -270 : 0;
-
-  pagina.drawImage(imagen, {
-    x: centro.x - tamano / 2,
-    y: centro.y - tamano / 2,
-    width: tamano,
-    height: tamano,
-    rotate: PDFLib.degrees(giroSello)
+        // Pre-rotamos la imagen en sentido contrario a la página para que,
+        // al rotarse la página, el sello siga derecho visualmente.
+        const r = ((giro % 360) + 360) % 360;
+        if (r === 0) {
+          canvas.toBlob(b => { URL.revokeObjectURL(url); if (!b) return reject(new Error('No se pudo generar el sello.')); b.arrayBuffer().then(ab=>resolve(new Uint8Array(ab))); }, 'image/png');
+          return;
+        }
+        const out = document.createElement('canvas');
+        out.width = S; out.height = S;
+        const o = out.getContext('2d');
+        o.translate(S/2,S/2);
+        o.rotate((-r * Math.PI) / 180);
+        o.drawImage(canvas,-S/2,-S/2,S,S);
+        out.toBlob(b => { URL.revokeObjectURL(url); if (!b) return reject(new Error('No se pudo generar el sello rotado.')); b.arrayBuffer().then(ab=>resolve(new Uint8Array(ab))); }, 'image/png');
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo leer la imagen del sello.')); };
+    img.src = url;
   });
+}
 
-  return {
-    x: centro.x - tamano / 2,
-    y: centro.y - tamano / 2,
-    giro: giroSello
-  };
+function coordenadasSelloInferiorDerecha(pagina, tamano, margen, rotacionFinal) {
+  const {width:W, height:H} = pagina.getSize();
+  const r = ((rotacionFinal % 360) + 360) % 360;
+  // Coordenadas PDF que terminan en la esquina inferior derecha visual.
+  if (r === 90) return {x:margen, y:margen};
+  if (r === 180) return {x:W - tamano - margen, y:H - tamano - margen};
+  if (r === 270) return {x:W - tamano - margen, y:margen};
+  return {x:W - tamano - margen, y:margen};
 }
 
 async function aplicarSelloAUnPdf(file) {
   if (!selloBytes || !selloBytes.length) {
-    throw new Error("El sello automático de este usuario no está disponible.");
+    throw new Error('El sello automático de este usuario no está disponible.');
   }
 
-  const {PDFDocument, rgb, StandardFonts} = PDFLib;
-
+  const {PDFDocument} = PDFLib;
   let pdfDoc;
   try {
     pdfDoc = await PDFDocument.load(await file.arrayBuffer());
   } catch (errorCarga) {
     console.error(errorCarga);
-    const mensaje = String(errorCarga?.message || "");
-    if (/encrypt/i.test(mensaje)) {
-      throw new Error("El PDF está protegido/encriptado. Quite la contraseña o la protección del documento antes de certificarlo.");
-    }
-    throw new Error("El archivo no es un PDF válido o está dañado.");
+    const mensaje = String(errorCarga?.message || '');
+    if (/encrypt/i.test(mensaje)) throw new Error('El PDF está protegido/encriptado. Quite la contraseña o la protección antes de certificarlo.');
+    throw new Error('El archivo no es un PDF válido o está dañado.');
   }
 
-  // El sello se carga una sola vez y se reutiliza en todas las páginas.
-  // La imagen NO se elimina ni se reemplaza por la fecha/hora/código.
-  let sellImage;
-  try {
-    sellImage = await pdfDoc.embedPng(selloBytes);
-  } catch (e) {
-    console.error('Error al incrustar sello PNG:', e);
-    throw new Error('No se pudo incrustar la imagen del sello. Verifique sello-jorge.png o sello-roberto.png.');
-  }
-
-  const fuente = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const tamano = TAMANO_SELLO_PT;
-  const margen = MARGEN_SELLO_PT;
-  const esquina = ESQUINA_SELLO;
   const paginas = pdfDoc.getPages();
-
-  if (!paginasSeleccionadas.size) {
-    throw new Error("Debes seleccionar al menos una página para certificar.");
-  }
+  if (!paginasSeleccionadas.size) throw new Error('Debes seleccionar al menos una página para certificar.');
 
   const fecha = fechaHoy();
   const hora = horaAhora();
   const certId = generarIdCertificacion();
+  const tamano = TAMANO_SELLO_PT;
+  const margen = MARGEN_SELLO_PT;
 
-  paginas.forEach((pagina, indice) => {
+  for (let indice=0; indice<paginas.length; indice++) {
+    const pagina = paginas[indice];
     const n = indice + 1;
+    const original = ((Number(pagina.getRotation()?.angle || 0) % 360) + 360) % 360;
+    const extra = Number(rotacionesPagina.get(n) || 0);
+    const final = (original + extra) % 360;
 
-    // Rotación original que ya tenía el PDF + giro elegido en SAMICERT.
-    const rotacionOriginal = normalizarRotacionPagina(pagina);
-    const rotacionExtra = Number(rotacionesPagina.get(n) || 0);
-    const rotacionFinal = (rotacionOriginal + rotacionExtra) % 360;
+    // La orientación elegida por el usuario queda incorporada al PDF NUEVO.
+    if (extra) pagina.setRotation(PDFLib.degrees(final));
+    if (!paginasSeleccionadas.has(n)) continue;
 
-    // La rotación se escribe SOLO en el PDF NUEVO.
-    if (rotacionExtra) {
-      pagina.setRotation(PDFLib.degrees(rotacionFinal));
-    }
-
-    if (!paginasSeleccionadas.has(n)) return;
-
-    // 1) SELLO: siempre en la esquina inferior derecha VISUAL y siempre derecho.
-    const sello = dibujarSelloEnEsquina(
-      pagina,
-      sellImage,
-      esquina,
-      tamano,
-      margen,
-      rotacionFinal
-    );
-
-    // 2) FECHA/HORA/CÓDIGO: se dibujan dentro del área del sello, sin volver
-    // a transformar las coordenadas. La transformación anterior doble era la
-    // causa de posiciones incorrectas cuando la página estaba rotada.
-    const tamFuenteFecha = Math.max(6.5, tamano * 0.078);
-    const tamFuenteHora = Math.max(4.2, tamFuenteFecha * 0.55);
-    const tamFuenteId = Math.max(3.8, tamFuenteFecha * 0.48);
-    const textos = [
-      [fecha, tamFuenteFecha],
-      [hora, tamFuenteHora],
-      [certId, tamFuenteId]
-    ];
-
-    const ys = [
-      tamano * 0.49,
-      tamano * 0.49 - tamFuenteFecha * 0.85,
-      tamano * 0.49 - tamFuenteFecha * 1.55
-    ];
-
-    textos.forEach(([texto, size], i) => {
-      const ancho = fuente.widthOfTextAtSize(texto, size);
-      const px = sello.x + tamano / 2 - ancho / 2;
-      const py = sello.y + ys[i];
-
-      pagina.drawText(texto, {
-        x: px,
-        y: py,
-        size,
-        font: fuente,
-        color: rgb(0.67, 0.14, 0.09),
-        rotate: PDFLib.degrees(sello.giro)
-      });
-    });
-  });
+    // Se compone sello + fecha + hora + código en una sola imagen y luego se
+    // pre-rota en sentido contrario. Esto evita que cualquier elemento salga
+    // de la página por las transformaciones de drawImage/drawText.
+    const selloPng = await crearImagenConInformacion(null, fecha, hora, certId, final);
+    const selloImg = await pdfDoc.embedPng(selloPng);
+    const pos = coordenadasSelloInferiorDerecha(pagina, tamano, margen, final);
+    pagina.drawImage(selloImg, {x:pos.x, y:pos.y, width:tamano, height:tamano});
+  }
 
   return {
     bytesSalida: await pdfDoc.save(),
     meta: {
-      id: certId,
-      fecha,
-      hora,
-      archivoOriginal: file.name,
-      paginasCertificadas: Array.from(paginasSeleccionadas).sort((a,b)=>a-b),
-      totalPaginas: paginas.length
+      id:certId, fecha, hora, archivoOriginal:file.name,
+      paginasCertificadas:Array.from(paginasSeleccionadas).sort((a,b)=>a-b),
+      totalPaginas:paginas.length,
+      rotaciones:Object.fromEntries(Array.from(rotacionesPagina.entries()))
     }
   };
 }
@@ -826,7 +780,7 @@ btnAplicar.addEventListener("click",async () => {
       zonaHoraria:"America/Lima",
       selloArchivo:USUARIOS_AUTORIZADOS[usuarioActual.uid].sello.replace("./",""),
       creadoEn:serverTimestamp(),
-      version:7,
+      version:6,
       estado:"certificado"
     };
 

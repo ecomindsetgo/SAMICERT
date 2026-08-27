@@ -168,7 +168,7 @@
             <div class="selector-cabecera">
               <div>
                 <div class="selector-titulo">Páginas a certificar</div>
-                <div class="selector-subtitulo" id="resumenPaginas">Selecciona las páginas que deseas sellar. Usa la 🔍 de cada página para verla ampliada sin cambiar esta vista.</div>
+                <div class="selector-subtitulo" id="resumenPaginas">Selecciona las páginas que deseas sellar. Usa 🔍 para ampliar y ↻ para girar la página. La rotación elegida se conservará en el PDF final firmado.</div>
               </div>
               <div class="selector-acciones">
                 <button type="button" class="btn-small" id="btnTodas">Todas</button>
@@ -179,7 +179,7 @@
             <div id="visorPaginas" class="visor-paginas"></div>
           </div>
 
-          <!-- Lupa para revisar una página en tamaño ampliado sin cambiar el visor normal -->
+          <!-- Visor ampliado. La rotación seleccionada se conserva en el PDF final. -->
           <div id="visorModal" class="visor-modal oculto" role="dialog" aria-modal="true" aria-label="Vista ampliada de página">
             <div class="visor-modal-bar">
               <div class="visor-modal-titulo" id="visorModalTitulo">Página</div>
@@ -188,14 +188,13 @@
                 <span class="visor-modal-btn" id="visorZoomTexto">100%</span>
                 <button type="button" class="visor-modal-btn" id="btnZoomMas">+</button>
                 <button type="button" class="visor-modal-btn" id="btnZoomAjustar">Ajustar</button>
-                <button type="button" class="visor-modal-btn" id="btnRotarModal">↻ Rotar</button>
                 <button type="button" class="visor-modal-btn visor-modal-cerrar" id="btnCerrarVisorModal" aria-label="Cerrar">✕</button>
               </div>
             </div>
             <div class="visor-modal-area" id="visorModalArea">
               <canvas id="visorModalCanvas"></canvas>
             </div>
-            <div class="visor-modal-ayuda">Use +/− para ampliar. También puede desplazarse por el documento con las barras de desplazamiento.</div>
+            <div class="visor-modal-ayuda">Use +/− para ampliar, ↻ para girar 90°. La orientación seleccionada se aplicará al PDF final firmado.</div>
           </div>
 
           <div class="fixed-config">
