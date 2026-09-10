@@ -50,21 +50,8 @@ let perfilActual = null;
 let selloBytes = null;
 
 const TAMANO_SELLO_PT = 90;
+const MARGEN_SELLO_PT = 3;
 const ESQUINA_SELLO = "inferior-derecha";
-
-// --- Corrección visual del sellado (Memorando N° 000694-2026-USJ-GAD-CSJSA-PJ) ---
-// El sello se aplica con transparencia para no ocultar el texto original,
-// y su margen se calcula dinámicamente según el tamaño de cada página,
-// en lugar de un valor fijo, para mantenerlo dentro del área de margen del documento.
-const OPACIDAD_SELLO = 0.55;          // 0 = invisible, 1 = opaco. 0.55 mantiene el sello visible sin tapar el texto.
-const MARGEN_SELLO_MIN_PT = 14;       // margen mínimo absoluto (~0.5 cm)
-const MARGEN_SELLO_PORCENTAJE = 0.025; // 2.5% del lado menor de la página
-
-function calcularMargenSello(pagina) {
-  const { width, height } = pagina.getSize();
-  const ladoMenor = Math.min(width, height);
-  return Math.max(MARGEN_SELLO_MIN_PT, ladoMenor * MARGEN_SELLO_PORCENTAJE);
-}
 let esAdministradorActual = false;
 
 const USUARIOS_AUTORIZADOS = {
@@ -696,8 +683,7 @@ function dibujarSelloEnEsquina(pagina, imagen, esquina, tamano, margen, rotacion
     y: pivote.y,
     width: tamano,
     height: tamano,
-    rotate: PDFLib.degrees(giroSello),
-    opacity: OPACIDAD_SELLO
+    rotate: PDFLib.degrees(giroSello)
   });
 
   return {
@@ -736,6 +722,7 @@ async function aplicarSelloAUnPdf(file) {
 
   const fuente = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const tamano = TAMANO_SELLO_PT;
+  const margen = MARGEN_SELLO_PT;
   const esquina = ESQUINA_SELLO;
   const paginas = pdfDoc.getPages();
 
@@ -759,8 +746,6 @@ async function aplicarSelloAUnPdf(file) {
     }
 
     if (!paginasSeleccionadas.has(n)) return;
-
-    const margen = calcularMargenSello(pagina);
 
     const sello = dibujarSelloEnEsquina(
       pagina,
