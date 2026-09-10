@@ -12,9 +12,9 @@ const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
 const db = getFirestore(appFirebase);
 
-// El visor de páginas (pdf.js) necesita su worker configurado explícitamente;
-// sin esto cae en un "fake worker" de un solo hilo, más lento e inestable
-// justamente con los documentos de muchas páginas.
+
+
+
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -50,8 +50,21 @@ let perfilActual = null;
 let selloBytes = null;
 
 const TAMANO_SELLO_PT = 90;
-const MARGEN_SELLO_PT = 3;
 const ESQUINA_SELLO = "inferior-derecha";
+
+// --- Corrección visual del sellado (Memorando N° 000694-2026-USJ-GAD-CSJSA-PJ) ---
+// El sello se aplica con transparencia para no ocultar el texto original,
+// y su margen se calcula dinámicamente según el tamaño de cada página,
+// en lugar de un valor fijo, para mantenerlo dentro del área de margen del documento.
+const OPACIDAD_SELLO = 0.55;          // 0 = invisible, 1 = opaco. 0.55 mantiene el sello visible sin tapar el texto.
+const MARGEN_SELLO_MIN_PT = 14;       // margen mínimo absoluto (~0.5 cm)
+const MARGEN_SELLO_PORCENTAJE = 0.025; // 2.5% del lado menor de la página
+
+function calcularMargenSello(pagina) {
+  const { width, height } = pagina.getSize();
+  const ladoMenor = Math.min(width, height);
+  return Math.max(MARGEN_SELLO_MIN_PT, ladoMenor * MARGEN_SELLO_PORCENTAJE);
+}
 let esAdministradorActual = false;
 
 const USUARIOS_AUTORIZADOS = {
@@ -124,7 +137,6 @@ async function cargarSelloAutomatico() {
   selloBytes = null;
   const autorizado = USUARIOS_AUTORIZADOS[usuarioActual?.uid];
 
-  // El administrador no certifica documentos y, por tanto, no necesita sello.
   if (usuarioActual?.uid === ADMIN_UID) return;
   if (!autorizado) throw new Error("Usuario no autorizado.");
 
@@ -136,7 +148,6 @@ async function cargarSelloAutomatico() {
 
     if (!selloBytes.length) throw new Error("El archivo del sello está vacío.");
 
-    // Solo se mantiene en memoria; no se muestra ni se permite cambiar desde la interfaz.
     console.log(`Sello automático cargado para ${autorizado.nombre}.`);
   } catch (error) {
     console.error(error);
@@ -201,13 +212,10 @@ async function cargarVisorPaginas(file) {
     paginasSeleccionadas = new Set(
       Array.from({length:totalPaginas}, (_,i) => i + 1)
     );
-    // Se reinician las rotaciones al cargar un PDF nuevo.
     rotacionesPagina = new Map();
     canvasesPorPagina = new Map();
     visor.innerHTML = "";
 
-    // Sirve tanto para documentos de 1 página como de varios cientos:
-    // se renderiza una por una y se informa el avance, sin bloquear la UI.
     for (let numero=1; numero<=totalPaginas; numero++) {
       if (totalPaginas > 1) {
         $("resumenPaginas").textContent =
@@ -258,9 +266,6 @@ async function cargarVisorPaginas(file) {
 
       meta.append(numeroEl, giroEl, estadoEl);
 
-      // Una página individual dañada o demasiado pesada de renderizar no debe
-      // tumbar la vista previa completa, sobre todo en PDFs de muchas páginas:
-      // esa página se sigue pudiendo certificar, solo que sin miniatura.
       try {
         const pagina = await pdfVista.getPage(numero);
         const canvas = document.createElement("canvas");
@@ -336,19 +341,9 @@ async function cargarVisorPaginas(file) {
 let visorModalPaginaActual = null;
 let visorModalZoom = 1;
 let visorModalRotacionExtra = 0;
-// Rotación elegida por el usuario para el PDF FINAL. Esto NUNCA toca el
-// archivo original: solo se guarda en memoria y se aplica al generar el
-// PDF nuevo en aplicarSelloAUnPdf(). El archivo que el usuario subió no
-// se reescribe ni se altera en ningún momento.
 let rotacionesPagina = new Map();
-// Referencia al <canvas> miniatura de cada página, para poder repintarlo
-// ya rotado apenas el usuario gira la página (sin depender del modal).
 let canvasesPorPagina = new Map();
 
-// Dibuja la miniatura de una página reflejando SIEMPRE la rotación ya
-// aplicada (la propia del PDF + la que el usuario haya elegido con ↻),
-// para que la tarjeta muestre de forma permanente cómo quedará esa
-// página en el PDF final, y no solo dentro del visor ampliado.
 async function renderMiniaturaPagina(numero) {
   const canvas = canvasesPorPagina.get(numero);
   if (!pdfVista || !canvas) return;
@@ -399,7 +394,6 @@ async function abrirVistaAmpliada(numero) {
     const area = $("visorModalArea");
     const canvas = $("visorModalCanvas");
     const anchoDisponible = Math.max(350, area.clientWidth - 70);
-    // Al abrir, la página se ajusta al ancho disponible; luego el usuario puede ampliar.
     visorModalZoom = Math.max(0.8, Math.min(1.5, anchoDisponible / baseViewport.width));
     await renderPaginaModal(pagina);
     $("visorModalTitulo").textContent = `Página ${numero} — vista ampliada`;
@@ -429,8 +423,6 @@ async function rotarVistaModal() {
   await renderPaginaModal(pagina);
   actualizarIndicadorRotacion(numero);
 
-  // El giro elegido aquí es el mismo que se aplicará al PDF final:
-  // se refleja también en la miniatura de la tarjeta correspondiente.
   await renderMiniaturaPagina(numero);
   actualizarBadgeGiro(numero);
 }
@@ -441,17 +433,12 @@ function actualizarIndicadorRotacion(numero) {
   if (titulo) titulo.textContent = `Página ${numero} — vista ampliada${giro ? ` — giro adicional: ${giro}°` : ""}`;
 }
 
-// Rotar desde la tarjeta: el giro se guarda de inmediato para el PDF final
-// (se ve reflejado en la miniatura ahí mismo, sin necesidad de abrir la
-// vista ampliada) y el archivo original que se subió no se toca en nada.
 async function rotarPaginaParaSalida(numero) {
   const giro = (Number(rotacionesPagina.get(numero) || 0) + 90) % 360;
   rotacionesPagina.set(numero, giro);
   await renderMiniaturaPagina(numero);
   actualizarBadgeGiro(numero);
 
-  // Si la vista ampliada de esta misma página está abierta, se mantiene
-  // sincronizada con el nuevo giro.
   if (!$("visorModal").classList.contains("oculto") && visorModalPaginaActual === numero) {
     visorModalRotacionExtra = giro;
     const pagina = await pdfVista.getPage(numero);
@@ -520,8 +507,6 @@ document.addEventListener("keydown", e => {
 
 function resetearEstadoSesion() {
   cerrarVistaAmpliada();
-  // Limpia por completo el documento que pudiera haber quedado en memoria
-  // para que el siguiente usuario nunca herede archivos ni páginas del anterior.
   if (resultadoBlob) {
     try { URL.revokeObjectURL(resultadoBlob); } catch (_) {}
   }
@@ -555,7 +540,6 @@ function resetearEstadoSesion() {
   ocultarHash();
   renderLista();
 
-  // Limpia también los resultados de consulta/verificación de la sesión anterior.
   if ($("resultadoConsulta")) $("resultadoConsulta").classList.add("oculto");
   if ($("noEncontradoConsulta")) $("noEncontradoConsulta").classList.add("oculto");
   if ($("coincidenciaHash")) {
@@ -565,7 +549,6 @@ function resetearEstadoSesion() {
   if ($("hashVerificado")) $("hashVerificado").classList.add("oculto");
   if ($("inputConsultaId")) $("inputConsultaId").value = "";
 
-  // Vuelve siempre al inicio para que cada sesión empiece limpia.
   mostrarPagina("inicio");
 }
 
@@ -664,9 +647,6 @@ function normalizarRotacionPagina(pagina) {
   return ((a % 360) + 360) % 360;
 }
 
-// Convierte una posición expresada en la orientación visual FINAL de la página
-// a coordenadas PDF (origen abajo/izquierda). Esto permite que "inferior-derecha"
-// siga siendo inferior-derecha aunque la página tenga /Rotate 90/180/270.
 function centroSelloEnCoordenadasPdf(pagina, esquina, tamano, margen, rotacionFinal) {
   const {width, height} = pagina.getSize();
   const rot = ((Number(rotacionFinal) % 360) + 360) % 360;
@@ -681,8 +661,6 @@ function centroSelloEnCoordenadasPdf(pagina, esquina, tamano, margen, rotacionFi
     ? margen + tamano / 2
     : altoVisual - margen - tamano / 2;
 
-  // Transformación inversa de la rotación de página.
-  // PDF usa coordenadas con origen abajo/izquierda.
   if (rot === 90) {
     return { x: width - centroVisualY, y: centroVisualX };
   }
@@ -695,13 +673,6 @@ function centroSelloEnCoordenadasPdf(pagina, esquina, tamano, margen, rotacionFi
   return { x: centroVisualX, y: centroVisualY };
 }
 
-// pdf-lib rota drawImage/drawText alrededor del punto (x,y) que se le pasa,
-// que es la esquina inferior-izquierda ANTES de rotar — NO alrededor del
-// centro de la imagen/texto. Si se sigue usando "centro - tamaño/2" como
-// pivote para páginas rotadas 90/180/270, el sello queda desplazado fuera
-// de la esquina inferior (por eso aparecía arriba y/o de cabeza al rotar
-// una hoja). Aquí se calcula el pivote correcto para que, tras rotar,
-// el centro del sello caiga exactamente en el punto deseado.
 function pivoteParaRotar(centro, tamano, giroDeg) {
   const rad = giroDeg * Math.PI / 180;
   const cos = Math.cos(rad), sin = Math.sin(rad);
@@ -711,19 +682,12 @@ function pivoteParaRotar(centro, tamano, giroDeg) {
   return { x: centro.x - rx, y: centro.y - ry };
 }
 
-// Dibuja el sello siempre derecho respecto a lo que el usuario ve, y
-// siempre centrado en la esquina elegida (por defecto, inferior derecha)
-// sin importar si la página está rotada 90°, 180° o 270°.
 function dibujarSelloEnEsquina(pagina, imagen, esquina, tamano, margen, rotacionFinal) {
   const centro = centroSelloEnCoordenadasPdf(
     pagina, esquina, tamano, margen, rotacionFinal
   );
 
   const rot = ((Number(rotacionFinal) % 360) + 360) % 360;
-  // OJO: el giro del sello debe ser igual (mismo signo) al de la página,
-  // no el inverso — así se cancela la rotación de la página y el sello
-  // queda derecho para quien lo ve. Con el signo invertido el sello
-  // terminaba de costado/al revés en páginas rotadas 90° o 270°.
   const giroSello = rot === 90 ? 90 : rot === 180 ? 180 : rot === 270 ? 270 : 0;
   const pivote = pivoteParaRotar(centro, tamano, giroSello);
 
@@ -732,7 +696,8 @@ function dibujarSelloEnEsquina(pagina, imagen, esquina, tamano, margen, rotacion
     y: pivote.y,
     width: tamano,
     height: tamano,
-    rotate: PDFLib.degrees(giroSello)
+    rotate: PDFLib.degrees(giroSello),
+    opacity: OPACIDAD_SELLO
   });
 
   return {
@@ -761,8 +726,6 @@ async function aplicarSelloAUnPdf(file) {
     throw new Error("El archivo no es un PDF válido o está dañado.");
   }
 
-  // El sello se carga una sola vez y se reutiliza en todas las páginas.
-  // La imagen NO se elimina ni se reemplaza por la fecha/hora/código.
   let sellImage;
   try {
     sellImage = await pdfDoc.embedPng(selloBytes);
@@ -773,7 +736,6 @@ async function aplicarSelloAUnPdf(file) {
 
   const fuente = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const tamano = TAMANO_SELLO_PT;
-  const margen = MARGEN_SELLO_PT;
   const esquina = ESQUINA_SELLO;
   const paginas = pdfDoc.getPages();
 
@@ -788,19 +750,18 @@ async function aplicarSelloAUnPdf(file) {
   paginas.forEach((pagina, indice) => {
     const n = indice + 1;
 
-    // Rotación original que ya tenía el PDF + giro elegido en SAMICERT.
     const rotacionOriginal = normalizarRotacionPagina(pagina);
     const rotacionExtra = Number(rotacionesPagina.get(n) || 0);
     const rotacionFinal = (rotacionOriginal + rotacionExtra) % 360;
 
-    // La rotación se escribe SOLO en el PDF NUEVO.
     if (rotacionExtra) {
       pagina.setRotation(PDFLib.degrees(rotacionFinal));
     }
 
     if (!paginasSeleccionadas.has(n)) return;
 
-    // 1) SELLO: siempre en la esquina inferior derecha VISUAL y siempre derecho.
+    const margen = calcularMargenSello(pagina);
+
     const sello = dibujarSelloEnEsquina(
       pagina,
       sellImage,
@@ -810,12 +771,6 @@ async function aplicarSelloAUnPdf(file) {
       rotacionFinal
     );
 
-    // 2) FECHA/HORA/CÓDIGO: se dibujan dentro del área del sello. Igual que
-    // con la imagen, drawText rota alrededor del punto (x,y) que se le pasa,
-    // así que el desplazamiento dentro del sello (medido en el "espacio
-    // local" del sello, sin rotar) debe rotarse por el mismo ángulo antes de
-    // sumarlo al pivote — si no, el texto queda fuera de lugar en páginas
-    // rotadas aunque el sello ya esté bien ubicado.
     const tamFuenteFecha = Math.max(6.5, tamano * 0.078);
     const tamFuenteHora = Math.max(4.2, tamFuenteFecha * 0.55);
     const tamFuenteId = Math.max(3.8, tamFuenteFecha * 0.48);
@@ -837,12 +792,8 @@ async function aplicarSelloAUnPdf(file) {
 
     textos.forEach(([texto, size], i) => {
       const ancho = fuente.widthOfTextAtSize(texto, size);
-      // Posición dentro del sello, en su espacio local (sin rotar).
       const localX = tamano / 2 - ancho / 2;
       const localY = ys[i];
-      // Se rota ese desplazamiento por el mismo ángulo que el sello y se
-      // suma al pivote real, para que quede pegado al sello sin importar
-      // la rotación de la página.
       const px = sello.x + (cosGiro * localX - sinGiro * localY);
       const py = sello.y + (sinGiro * localX + cosGiro * localY);
 
@@ -933,8 +884,6 @@ btnAplicar.addEventListener("click",async () => {
     await setDoc(doc(db,"certificaciones",resultado.meta.id),registro);
     await guardarResultado(resultado.bytesSalida,nombreConSufijo(archivoSeleccionado.name));
 
-    // La certificación terminó correctamente. Retiramos inmediatamente
-    // el PDF de la pantalla para que no vuelva a aparecer como pendiente.
     limpiarArchivo();
 
     mostrarEstado(
@@ -1061,18 +1010,15 @@ $("inputVerificarPdf").addEventListener("change",async e => {
   }
 });
 
-// --- Historial: estado en memoria (cache), filtros y paginación ---
-let historialRegistros = [];   // todos los registros tal como vienen de Firestore
-let historialFiltrados = [];   // resultado luego de aplicar los filtros activos
+let historialRegistros = [];
+let historialFiltrados = [];
 let historialPaginaActual = 1;
 
 function fechaRegistroEnMs(r) {
   if (r.creadoEn?.seconds) return r.creadoEn.seconds * 1000;
-  // Respaldo si el registro no trae "creadoEn": intenta usar el campo "fecha" (dd/mm/aaaa o similar)
   const partes = (r.fecha || "").split(/[\/\-]/).map(Number);
   if (partes.length === 3) {
     const [a,b,c] = partes;
-    // Heurística simple: si el primer valor es > 31, es formato aaaa-mm-dd
     const ms = a > 31 ? Date.UTC(a, b - 1, c) : Date.UTC(c, b - 1, a);
     if (!Number.isNaN(ms)) return ms;
   }
@@ -1100,8 +1046,6 @@ async function cargarHistorial() {
   }
 }
 
-// Llena el <select> de certificadores con los nombres realmente presentes en los registros,
-// sin depender de una lista fija (si en el futuro se agrega un tercer certificador, aparece solo).
 function poblarFiltroCertificadorHistorial() {
   const select = $("histCertificador");
   const valorPrevio = select.value;
@@ -1117,8 +1061,6 @@ function poblarFiltroCertificadorHistorial() {
   if (nombres.includes(valorPrevio)) select.value = valorPrevio;
 }
 
-// Aplica búsqueda de texto + certificador + rango de fechas sobre historialRegistros,
-// recalcula el total de folios certificados y vuelve a la página 1 del resultado filtrado.
 function aplicarFiltrosHistorial() {
   const texto = ($("histBuscar").value || "").trim().toLowerCase();
   const certificador = $("histCertificador").value;
@@ -1500,8 +1442,6 @@ passwordForm.addEventListener("submit", async e => {
       currentPassword
     );
 
-    // Reautenticación: Firebase exige una sesión reciente para permitir
-    // operaciones sensibles como el cambio de contraseña.
     await reauthenticateWithCredential(usuarioActual, credential);
     await updatePassword(usuarioActual, newPassword);
 

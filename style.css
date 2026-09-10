@@ -20,7 +20,7 @@ button,input,select{font:inherit}
 button{cursor:pointer}
 .oculto{display:none!important}
 
-/* LOGIN */
+
 .login-screen{
   position:fixed;inset:0;z-index:9999;
   display:flex;align-items:center;justify-content:center;
@@ -64,7 +64,7 @@ button{cursor:pointer}
 .login-error{margin-top:12px;padding:10px 12px;border-radius:8px;background:#fff3f1;border:1px solid #f1c5bf;color:var(--danger);font-size:12px}
 
 
-/* CAMBIO DE CONTRASEÑA */
+
 .password-panel{
   max-width:620px;
 }
@@ -118,7 +118,7 @@ button{cursor:pointer}
 }
 .btn-password:hover{background:rgba(255,255,255,.15)}
 
-/* ADMINISTRACIÓN */
+
 .admin-danger{color:var(--danger)}
 .admin-note{
   margin-top:12px;padding:12px 14px;background:#fffaf0;border:1px solid #f1dda8;
@@ -150,7 +150,7 @@ button{cursor:pointer}
   .user-area{min-width:0;flex-wrap:wrap}
 }
 
-/* APP SHELL */
+
 .app-shell{min-height:100vh;display:flex}
 .sidebar{
   position:fixed;left:0;top:0;bottom:0;width:250px;
@@ -303,7 +303,7 @@ button{cursor:pointer}
 .visor-cargando{grid-column:1/-1;padding:25px;text-align:center;color:var(--muted);font-size:12px}
 
 
-/* Visor ampliado: no modifica la vista normal de páginas */
+
 .visor-lupa{
   position:absolute;left:10px;top:10px;width:30px;height:30px;
   border:1px solid #d5dde7;background:#fff;color:#1769d2;border-radius:50%;
