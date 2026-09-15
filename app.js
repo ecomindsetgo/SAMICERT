@@ -99,6 +99,194 @@ async function calcularSHA256(bytes) {
     .map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   CONTROL DE DUPLICADOS / RECERTIFICACIONES
+   ─────────────────────────────────────────────────────────────────────────
+   Problema que resuelve: el campo "sha256" que ya existía es la huella del
+   PDF YA SELLADO. Ese PDF incorpora el identificador CERT-…, la fecha y la
+   hora, de modo que certificar dos veces el mismo documento produce SIEMPRE
+   bytes distintos y, por lo tanto, un SHA-256 distinto. Con ese dato es
+   imposible detectar una doble certificación.
+
+   Solución: se calcula además "sha256Origen", la huella del archivo ORIGINAL
+   tal como el usuario lo carga, antes de sellarlo. Ese valor sí es estable y
+   permite reconocer el mismo documento aunque se le cambie el nombre.
+
+   Se contrastan dos criterios complementarios:
+     · Coincidencia por CONTENIDO (sha256Origen) → es literalmente el mismo
+       archivo. Es el criterio fuerte.
+     · Coincidencia por NOMBRE (archivoOriginal) → puede ser una redigitalización
+       de la misma solicitud. Es el criterio de respaldo, y además es el único
+       que funciona contra los registros anteriores a esta actualización,
+       que no tienen sha256Origen guardado.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+let duplicadosDetectados = [];   // certificaciones previas que coinciden
+let hashOrigenActual = null;     // SHA-256 del archivo original cargado
+
+async function buscarCertificacionesPrevias(hashOrigen, nombreArchivo) {
+  const encontrados = new Map(); // id → { registro, porContenido, porNombre }
+
+  const registrar = (docSnap, motivo) => {
+    const data = docSnap.data();
+    const id = data.id || docSnap.id;
+    if (!encontrados.has(id)) {
+      encontrados.set(id, { registro: data, docId: docSnap.id, porContenido: false, porNombre: false });
+    }
+    encontrados.get(id)[motivo] = true;
+  };
+
+  try {
+    if (hashOrigen) {
+      const q1 = query(
+        collection(db, "certificaciones"),
+        where("sha256Origen", "==", hashOrigen),
+        limit(20)
+      );
+      (await getDocs(q1)).forEach(d => registrar(d, "porContenido"));
+    }
+
+    if (nombreArchivo) {
+      const q2 = query(
+        collection(db, "certificaciones"),
+        where("archivoOriginal", "==", nombreArchivo),
+        limit(20)
+      );
+      (await getDocs(q2)).forEach(d => registrar(d, "porNombre"));
+    }
+  } catch (err) {
+    console.error("No se pudo consultar certificaciones previas:", err);
+    throw err;
+  }
+
+  // Más recientes primero
+  return Array.from(encontrados.values()).sort((a, b) => {
+    const fa = `${a.registro.fecha || ""} ${a.registro.hora || ""}`;
+    const fb = `${b.registro.fecha || ""} ${b.registro.hora || ""}`;
+    return fb.localeCompare(fa);
+  });
+}
+
+/* Determina si las páginas que se van a certificar ahora se solapan con las
+   ya certificadas antes. Certificar folios distintos del mismo expediente es
+   una operación legítima; repetir los mismos folios no lo es. */
+function paginasSolapadas(previas, actuales) {
+  const set = new Set(previas || []);
+  return (actuales || []).filter(p => set.has(p));
+}
+
+function severidadDuplicado(coincidencias) {
+  if (!coincidencias.length) return "ninguna";
+  return coincidencias.some(c => c.porContenido) ? "alta" : "media";
+}
+
+function filaDuplicado(c) {
+  const r = c.registro;
+  const etiquetas = [];
+  if (c.porContenido) etiquetas.push('<span class="dup-tag dup-tag-alta">mismo contenido</span>');
+  if (c.porNombre)    etiquetas.push('<span class="dup-tag dup-tag-media">mismo nombre</span>');
+
+  const paginas = (r.paginasCertificadas || []).join(", ") || "—";
+  const recert = r.esRecertificacion
+    ? '<div class="dup-recert">Este registro ya era, a su vez, una recertificación.</div>'
+    : "";
+
+  return `
+    <div class="dup-item">
+      <div class="dup-item-head">
+        <strong>${escapeHtml(r.id || c.docId)}</strong>
+        ${etiquetas.join(" ")}
+      </div>
+      <div class="dup-item-body">
+        <span><strong>Archivo:</strong> ${escapeHtml(r.archivoOriginal || "—")}</span>
+        <span><strong>Fecha:</strong> ${escapeHtml(r.fecha || "—")} ${escapeHtml(r.hora || "")}</span>
+        <span><strong>Certificó:</strong> ${escapeHtml(r.certificadorNombre || r.certificadorEmail || "—")}</span>
+        <span><strong>Páginas certificadas:</strong> ${escapeHtml(paginas)} de ${escapeHtml(String(r.totalPaginas || "—"))}</span>
+      </div>
+      ${recert}
+    </div>`;
+}
+
+function mostrarAlertaDuplicado(coincidencias) {
+  const box = $("alertaDuplicado");
+  if (!box) return;
+
+  if (!coincidencias.length) {
+    box.classList.add("oculto");
+    box.innerHTML = "";
+    return;
+  }
+
+  const sev = severidadDuplicado(coincidencias);
+  box.className = "alerta-duplicado " + (sev === "alta" ? "alerta-alta" : "alerta-media");
+
+  const titulo = sev === "alta"
+    ? "⛔ Este documento YA FUE CERTIFICADO anteriormente"
+    : "⚠️ Ya existe una certificación con este mismo nombre de archivo";
+
+  const explicacion = sev === "alta"
+    ? "El contenido del PDF que acaba de cargar coincide exactamente (huella SHA-256) con una certificación ya registrada. Volver a certificarlo generará un segundo identificador para el mismo documento."
+    : "No se encontró coincidencia de contenido, pero sí de nombre de archivo. Puede tratarse de una redigitalización de la misma solicitud. Verifique antes de continuar.";
+
+  box.innerHTML = `
+    <div class="dup-titulo">${titulo}</div>
+    <div class="dup-nota">${explicacion}</div>
+    <div class="dup-lista">${coincidencias.map(filaDuplicado).join("")}</div>
+    <div class="dup-pie">Si la nueva certificación corresponde a folios distintos o a una versión corregida, podrá continuar registrando el motivo cuando presione «Aplicar sello y guardar».</div>`;
+  box.classList.remove("oculto");
+}
+
+/* Modal de confirmación: obliga a dejar constancia escrita del motivo antes
+   de permitir una segunda certificación sobre el mismo documento. */
+function confirmarRecertificacion(coincidencias, solapadas) {
+  return new Promise(resolve => {
+    const modal   = $("modalRecert");
+    const cuerpo  = $("modalRecertCuerpo");
+    const motivo  = $("modalRecertMotivo");
+    const btnOk   = $("modalRecertConfirmar");
+    const btnNo   = $("modalRecertCancelar");
+    const errorEl = $("modalRecertError");
+
+    if (!modal) { resolve({ continuar: true, motivo: "" }); return; }
+
+    const sev = severidadDuplicado(coincidencias);
+    const aviso = solapadas.length
+      ? `<div class="dup-solape">Las páginas <strong>${solapadas.join(", ")}</strong> ya fueron certificadas en un registro anterior. Esto es una duplicación efectiva del mismo folio.</div>`
+      : `<div class="dup-nosolape">Las páginas seleccionadas ahora no coinciden con las ya certificadas. Podría tratarse de una certificación complementaria legítima.</div>`;
+
+    cuerpo.innerHTML = `
+      <div class="dup-nota">${sev === "alta"
+        ? "El archivo cargado es idéntico a uno ya certificado."
+        : "Existe una certificación previa con el mismo nombre de archivo."}</div>
+      ${aviso}
+      <div class="dup-lista">${coincidencias.map(filaDuplicado).join("")}</div>`;
+
+    motivo.value = "";
+    errorEl.classList.add("oculto");
+    modal.classList.remove("oculto");
+    setTimeout(() => motivo.focus(), 50);
+
+    const cerrar = () => {
+      modal.classList.add("oculto");
+      btnOk.onclick = null;
+      btnNo.onclick = null;
+    };
+
+    btnNo.onclick = () => { cerrar(); resolve({ continuar: false, motivo: "" }); };
+
+    btnOk.onclick = () => {
+      const txt = motivo.value.trim();
+      if (txt.length < 15) {
+        errorEl.textContent = "Debe describir el motivo con al menos 15 caracteres. Este texto queda registrado de forma permanente.";
+        errorEl.classList.remove("oculto");
+        return;
+      }
+      cerrar();
+      resolve({ continuar: true, motivo: txt });
+    };
+  });
+}
+
 function ocultarHash() {
   $("hashResultado").classList.add("oculto");
 }
@@ -539,7 +727,7 @@ function resetearEstadoSesion() {
   mostrarPagina("inicio");
 }
 
-function seleccionarPdf(file) {
+async function seleccionarPdf(file) {
   if (!file || file.type !== "application/pdf") {
     alert("Selecciona un archivo PDF válido.");
     return;
@@ -556,11 +744,43 @@ function seleccionarPdf(file) {
   ocultarHash();
   paginasSeleccionadas.clear();
   totalPaginas = 0;
+  duplicadosDetectados = [];
+  hashOrigenActual = null;
   $("selectorPaginas").classList.add("oculto");
   $("visorPaginas").innerHTML = "";
+  mostrarAlertaDuplicado([]);
 
   renderLista();
   cargarVisorPaginas(file);
+
+  // Revisión de duplicados apenas se carga el archivo: el certificador se
+  // entera ANTES de invertir tiempo seleccionando páginas.
+  const box = $("alertaDuplicado");
+  if (box) {
+    box.className = "alerta-duplicado alerta-info";
+    box.innerHTML = '<div class="dup-nota">Verificando si este documento ya fue certificado…</div>';
+    box.classList.remove("oculto");
+  }
+
+  try {
+    const bytesOrigen = await file.arrayBuffer();
+    hashOrigenActual = await calcularSHA256(bytesOrigen);
+
+    // Si el usuario cambió de archivo mientras se calculaba, se descarta.
+    if (!archivoSeleccionado || archivoSeleccionado.file !== file) return;
+
+    duplicadosDetectados = await buscarCertificacionesPrevias(hashOrigenActual, file.name);
+    mostrarAlertaDuplicado(duplicadosDetectados);
+  } catch (err) {
+    console.error(err);
+    if (box) {
+      box.className = "alerta-duplicado alerta-media";
+      box.innerHTML = '<div class="dup-titulo">No se pudo verificar duplicados</div>' +
+        '<div class="dup-nota">No fue posible consultar el registro de certificaciones previas. Verifique manualmente antes de continuar. Detalle: ' +
+        escapeHtml(err.message || "error desconocido") + '</div>';
+      box.classList.remove("oculto");
+    }
+  }
 }
 
 function limpiarArchivo() {
@@ -571,6 +791,9 @@ function limpiarArchivo() {
   paginasSeleccionadas.clear();
   totalPaginas = 0;
   pdfVista = null;
+  duplicadosDetectados = [];
+  hashOrigenActual = null;
+  mostrarAlertaDuplicado([]);
 
   $("selectorPaginas").classList.add("oculto");
   $("visorPaginas").innerHTML = "";
@@ -846,6 +1069,52 @@ btnAplicar.addEventListener("click",async () => {
   if (!archivoSeleccionado || !usuarioActual) return;
 
   btnAplicar.disabled = true;
+
+  // ── Revalidación en el momento exacto de certificar ──────────────────
+  // No basta con la revisión hecha al cargar el archivo: entre ese momento
+  // y este pudo pasar mucho tiempo, o el otro certificador pudo haber
+  // registrado el mismo documento en paralelo.
+  let datosRecert = { continuar: true, motivo: "" };
+  try {
+    if (!hashOrigenActual) {
+      hashOrigenActual = await calcularSHA256(await archivoSeleccionado.file.arrayBuffer());
+    }
+    duplicadosDetectados = await buscarCertificacionesPrevias(
+      hashOrigenActual,
+      archivoSeleccionado.name
+    );
+    mostrarAlertaDuplicado(duplicadosDetectados);
+
+    if (duplicadosDetectados.length) {
+      const paginasActuales = Array.from(paginasSeleccionadas).sort((a,b)=>a-b);
+      const solapadas = duplicadosDetectados
+        .flatMap(c => paginasSolapadas(c.registro.paginasCertificadas, paginasActuales));
+      const solapeUnico = Array.from(new Set(solapadas)).sort((a,b)=>a-b);
+
+      datosRecert = await confirmarRecertificacion(duplicadosDetectados, solapeUnico);
+
+      if (!datosRecert.continuar) {
+        btnAplicar.disabled = false;
+        renderLista();
+        mostrarEstado(
+          "Certificación cancelada por el operador: el documento ya contaba con una certificación previa.",
+          "error"
+        );
+        return;
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    btnAplicar.disabled = false;
+    renderLista();
+    mostrarEstado(
+      "No se pudo verificar si el documento ya fue certificado, por lo que la operación se detuvo por seguridad. " +
+      (err.message || ""),
+      "error"
+    );
+    return;
+  }
+
   archivoSeleccionado.estado = "procesando";
   renderLista();
 
@@ -856,6 +1125,10 @@ btnAplicar.addEventListener("click",async () => {
     const registro = {
       ...resultado.meta,
       sha256,
+      sha256Origen: hashOrigenActual,
+      esRecertificacion: duplicadosDetectados.length > 0,
+      motivoRecertificacion: datosRecert.motivo || "",
+      certificacionesPrevias: duplicadosDetectados.map(c => c.registro.id || c.docId),
       certificadorUid:usuarioActual.uid,
       certificadorNombre:perfilActual?.nombre || usuarioActual.displayName || usuarioActual.email || "Usuario autorizado",
       certificadorEmail:usuarioActual.email || "",
@@ -871,9 +1144,18 @@ btnAplicar.addEventListener("click",async () => {
 
     limpiarArchivo();
 
-    mostrarEstado(
-      "Certificación registrada correctamente. El identificador y SHA-256 fueron almacenados automáticamente."
-    );
+    if (duplicadosDetectados.length) {
+      mostrarEstado(
+        "Recertificación registrada. Quedó constancia permanente del motivo y de los identificadores previos: " +
+        duplicadosDetectados.map(c => c.registro.id || c.docId).join(", ") + "."
+      );
+    } else {
+      mostrarEstado(
+        "Certificación registrada correctamente. El identificador y SHA-256 fueron almacenados automáticamente."
+      );
+    }
+    duplicadosDetectados = [];
+    hashOrigenActual = null;
   } catch (err) {
     console.error(err);
 
@@ -904,7 +1186,7 @@ async function renderDetalleConsulta(registro) {
     <strong>Archivo original:</strong> ${escapeHtml(registro.archivoOriginal || "")}<br>
     <strong>Fecha / hora:</strong> ${escapeHtml(registro.fecha || "")} ${escapeHtml(registro.hora || "")}<br>
     <strong>Páginas certificadas:</strong> ${escapeHtml(paginas)} de ${escapeHtml(registro.totalPaginas || "")}<br>
-    <strong>Estado:</strong> Certificación registrada
+    <strong>Estado:</strong> Certificación registrada${registro.esRecertificacion ? '<br><br><strong style="color:#b42318">⚠ RECERTIFICACIÓN</strong><br><strong>Motivo declarado:</strong> ' + escapeHtml(registro.motivoRecertificacion || "sin motivo registrado") + '<br><strong>Certificaciones previas del mismo documento:</strong> ' + escapeHtml((registro.certificacionesPrevias || []).join(", ")) : ""}
   `;
 
   $("resultadoConsulta").classList.remove("oculto");
@@ -980,7 +1262,7 @@ $("inputVerificarPdf").addEventListener("change",async e => {
           <strong>Archivo original:</strong> ${escapeHtml(registro.archivoOriginal || "")}<br>
           <strong>Fecha / hora:</strong> ${escapeHtml(registro.fecha || "")} ${escapeHtml(registro.hora || "")}<br>
           <strong>Páginas certificadas:</strong> ${escapeHtml((registro.paginasCertificadas || []).join(", "))} de ${escapeHtml(registro.totalPaginas || "")}<br>
-          <strong>Estado:</strong> Certificación registrada
+          <strong>Estado:</strong> Certificación registrada${registro.esRecertificacion ? '<br><strong style="color:#b42318">⚠ Recertificación:</strong> ' + escapeHtml(registro.motivoRecertificacion || "sin motivo registrado") + '<br><strong>Certificaciones previas:</strong> ' + escapeHtml((registro.certificacionesPrevias || []).join(", ")) : ""}
         </div>`;
     } else {
       detalle.innerHTML = `

@@ -164,6 +164,8 @@
 
           <div class="lista oculto" id="lista"></div>
 
+          <div id="alertaDuplicado" class="alerta-duplicado oculto"></div>
+
           <div id="selectorPaginas" class="selector-paginas oculto">
             <div class="selector-cabecera">
               <div>
@@ -443,6 +445,25 @@
       </footer>
     </div>
   </main>
+</div>
+
+<div id="modalRecert" class="modal-recert oculto" role="dialog" aria-modal="true" aria-labelledby="modalRecertTitulo">
+  <div class="modal-recert-caja">
+    <div class="modal-recert-cabecera">
+      <h3 id="modalRecertTitulo">&#9888; Confirmar recertificaci&oacute;n</h3>
+    </div>
+    <div class="modal-recert-cuerpo" id="modalRecertCuerpo"></div>
+    <div class="modal-recert-campo">
+      <label for="modalRecertMotivo"><strong>Motivo de la nueva certificaci&oacute;n</strong> (obligatorio)</label>
+      <p class="modal-recert-ayuda">Indique por qu&eacute; corresponde certificar nuevamente este documento: folios adicionales, correcci&oacute;n de digitalizaci&oacute;n, nueva solicitud del usuario, etc. Este texto queda registrado de forma permanente junto con su nombre y no puede modificarse despu&eacute;s.</p>
+      <textarea id="modalRecertMotivo" rows="3" placeholder="Ej.: Se certifican los folios 7 al 12, no incluidos en la certificaci&oacute;n CERT-2026-XXXX."></textarea>
+      <div id="modalRecertError" class="modal-recert-error oculto"></div>
+    </div>
+    <div class="modal-recert-acciones">
+      <button type="button" class="btn-gray" id="modalRecertCancelar">Cancelar certificaci&oacute;n</button>
+      <button type="button" class="btn-green" id="modalRecertConfirmar">Registrar recertificaci&oacute;n</button>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="app.js"></script>
