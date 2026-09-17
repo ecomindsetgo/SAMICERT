@@ -99,27 +99,6 @@ async function calcularSHA256(bytes) {
     .map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   CONTROL DE DUPLICADOS / RECERTIFICACIONES
-   ─────────────────────────────────────────────────────────────────────────
-   Problema que resuelve: el campo "sha256" que ya existía es la huella del
-   PDF YA SELLADO. Ese PDF incorpora el identificador CERT-…, la fecha y la
-   hora, de modo que certificar dos veces el mismo documento produce SIEMPRE
-   bytes distintos y, por lo tanto, un SHA-256 distinto. Con ese dato es
-   imposible detectar una doble certificación.
-
-   Solución: se calcula además "sha256Origen", la huella del archivo ORIGINAL
-   tal como el usuario lo carga, antes de sellarlo. Ese valor sí es estable y
-   permite reconocer el mismo documento aunque se le cambie el nombre.
-
-   Se contrastan dos criterios complementarios:
-     · Coincidencia por CONTENIDO (sha256Origen) → es literalmente el mismo
-       archivo. Es el criterio fuerte.
-     · Coincidencia por NOMBRE (archivoOriginal) → puede ser una redigitalización
-       de la misma solicitud. Es el criterio de respaldo, y además es el único
-       que funciona contra los registros anteriores a esta actualización,
-       que no tienen sha256Origen guardado.
-   ═══════════════════════════════════════════════════════════════════════ */
 
 let duplicadosDetectados = [];   // certificaciones previas que coinciden
 let hashOrigenActual = null;     // SHA-256 del archivo original cargado
@@ -916,6 +895,119 @@ function dibujarSelloEnEsquina(pagina, imagen, esquina, tamano, margen, rotacion
   };
 }
 
+/* ── Página inicial de certificación con QR de consulta pública ──────────
+   Se genera el QR como vectores (rectángulos) directos en el PDF, con la
+   librería qrcode-generator (window.qrcode). No requiere canvas ni imagen
+   embebida: el resultado es nítido a cualquier resolución de impresión y
+   no depende de conexión a internet en el momento de certificar. */
+
+const DOMINIO_PUBLICO = "https://samicert.ecomindsetgo.com";
+
+function urlConsultaPublica(certId) {
+  return `${DOMINIO_PUBLICO}/verificar.html?id=${encodeURIComponent(certId)}`;
+}
+
+function generarModulosQr(texto) {
+  const qr = qrcode(0, "M"); // 0 = versión automática según longitud del texto
+  qr.addData(texto);
+  qr.make();
+  const n = qr.getModuleCount();
+  const modulos = [];
+  for (let fila = 0; fila < n; fila++) {
+    const linea = [];
+    for (let col = 0; col < n; col++) linea.push(qr.isDark(fila, col));
+    modulos.push(linea);
+  }
+  return modulos;
+}
+
+function dibujarQrVectorial(pagina, modulos, { x, y, tamano, rgbColor }) {
+  const n = modulos.length;
+  const lado = tamano / n;
+  // margen blanco (quiet zone) ya se resuelve dejando el propio cuadro sin
+  // fondo oscuro alrededor; el llamador debe reservar el espacio.
+  for (let fila = 0; fila < n; fila++) {
+    for (let col = 0; col < n; col++) {
+      if (!modulos[fila][col]) continue;
+      pagina.drawRectangle({
+        x: x + col * lado,
+        y: y + (n - fila - 1) * lado, // el eje Y del PDF crece hacia arriba
+        width: lado,
+        height: lado,
+        color: rgbColor
+      });
+    }
+  }
+}
+
+async function agregarPaginaCertificacion(pdfDoc, datos) {
+  const { rgb, StandardFonts } = PDFLib;
+  const fuenteTitulo = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fuenteTexto = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const pagina = pdfDoc.insertPage(0, [595.28, 841.89]); // A4 en puntos
+  const { width, height } = pagina.getSize();
+  const margenX = 64;
+  const azul = rgb(0.12, 0.22, 0.4);
+  const gris = rgb(0.4, 0.4, 0.4);
+  const negro = rgb(0.1, 0.1, 0.1);
+
+  let y = height - 100;
+  pagina.drawText("CORTE SUPERIOR DE JUSTICIA DEL SANTA", { x: margenX, y, size: 12, font: fuenteTitulo, color: azul });
+  y -= 16;
+  pagina.drawText("Línea de Producción de Microformas Digitales (LPMD)", { x: margenX, y, size: 9.5, font: fuenteTexto, color: gris });
+
+  y -= 46;
+  pagina.drawText("DOCUMENTO CERTIFICADO", { x: margenX, y, size: 19, font: fuenteTitulo, color: azul });
+
+  y -= 44;
+  const filas = [
+    ["Documento certificado por:", datos.nombreCertificador],
+    ["Total de páginas:", String(datos.totalPaginas)],
+    ["Total de folios certificados:", String(datos.totalFolios)],
+    ["Código de certificación:", datos.certId],
+    ["Fecha y hora:", `${datos.fecha}  ${datos.hora}`]
+  ];
+  filas.forEach(([etiqueta, valor]) => {
+    pagina.drawText(etiqueta, { x: margenX, y, size: 11.5, font: fuenteTexto, color: negro });
+    const anchoEtiqueta = fuenteTexto.widthOfTextAtSize(etiqueta + "  ", 11.5);
+    pagina.drawText(valor, { x: margenX + anchoEtiqueta, y, size: 11.5, font: fuenteTitulo, color: negro });
+    y -= 22;
+  });
+
+  y -= 28;
+  pagina.drawLine({ start: { x: margenX, y }, end: { x: width - margenX, y }, thickness: 0.75, color: rgb(0.8, 0.8, 0.8) });
+
+  // ── QR y mensaje de consulta ──
+  const tamanoQr = 118;
+  const qrX = width - margenX - tamanoQr;
+  const qrY = y - tamanoQr - 30;
+
+  const modulos = generarModulosQr(datos.urlConsulta);
+  dibujarQrVectorial(pagina, modulos, { x: qrX, y: qrY, tamano: tamanoQr, rgbColor: negro });
+  pagina.drawText(datos.certId, {
+    x: qrX, y: qrY - 13, size: 8, font: fuenteTexto, color: gris
+  });
+
+  // No se imprime la URL completa con parámetros: una dirección larga sin
+  // espacios no se ajusta al ancho de columna (pdf-lib solo corta líneas en
+  // espacios) y una persona no va a transcribirla a mano de todos modos.
+  // Se muestra el dominio corto para visitar, y el código de certificación
+  // (ya impreso arriba) es lo que la persona ingresa allí manualmente.
+  const anchoMensaje = qrX - margenX - 20;
+  pagina.drawText("Puede consultar la validez de este documento", { x: margenX, y: y - 40, size: 11, font: fuenteTexto, color: negro, maxWidth: anchoMensaje });
+  pagina.drawText("escaneando el código QR, o ingresando a:", { x: margenX, y: y - 58, size: 11, font: fuenteTexto, color: negro, maxWidth: anchoMensaje });
+  pagina.drawText(DOMINIO_PUBLICO.replace(/^https?:\/\//, ""), { x: margenX, y: y - 80, size: 13, font: fuenteTitulo, color: rgb(0.05, 0.32, 0.6) });
+  pagina.drawText("e ingresando el código de certificación indicado arriba.", { x: margenX, y: y - 98, size: 9.5, font: fuenteTexto, color: gris, maxWidth: anchoMensaje });
+
+  pagina.drawText(
+    "Este documento consta de una carátula de certificación y del contenido original. La numeración de folios certificados no incluye esta carátula.",
+    { x: margenX, y: 70, size: 8.5, font: fuenteTexto, color: gris, maxWidth: width - margenX * 2, lineHeight: 11 }
+  );
+
+  return pagina;
+}
+
 async function aplicarSelloAUnPdf(file) {
   if (!selloBytes || !selloBytes.length) {
     throw new Error("El sello automático de este usuario no está disponible.");
@@ -1016,6 +1108,20 @@ async function aplicarSelloAUnPdf(file) {
     });
   });
 
+  // La carátula se agrega DESPUÉS de sellar todas las páginas originales,
+  // para que la numeración de folios y la rotación se calculen siempre
+  // sobre el documento original y no se corran por la portada.
+  const urlConsulta = urlConsultaPublica(certId);
+  await agregarPaginaCertificacion(pdfDoc, {
+    nombreCertificador: perfilActual?.nombre || usuarioActual?.displayName || usuarioActual?.email || "Certificador",
+    totalPaginas: paginas.length,
+    totalFolios: paginasSeleccionadas.size,
+    certId,
+    fecha,
+    hora,
+    urlConsulta
+  });
+
   return {
     bytesSalida: await pdfDoc.save(),
     meta: {
@@ -1024,7 +1130,8 @@ async function aplicarSelloAUnPdf(file) {
       hora,
       archivoOriginal: file.name,
       paginasCertificadas: Array.from(paginasSeleccionadas).sort((a,b)=>a-b),
-      totalPaginas: paginas.length
+      totalPaginas: paginas.length,
+      urlConsulta
     }
   };
 }
