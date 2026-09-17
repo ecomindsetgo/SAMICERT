@@ -1018,21 +1018,12 @@ function nombreConSufijo(nombre) {
 async function guardarResultado(bytesSalida,nombre) {
   const blob = new Blob([bytesSalida],{type:"application/pdf"});
 
-  if ("showSaveFilePicker" in window) {
-    const handle = await window.showSaveFilePicker({
-      suggestedName:nombre,
-      types:[{
-        description:"Documento PDF",
-        accept:{"application/pdf":[".pdf"]}
-      }]
-    });
-
-    const writable = await handle.createWritable();
-    await writable.write(blob);
-    await writable.close();
-    return true;
-  }
-
+  // Nota: se descartó showSaveFilePicker porque exige que el navegador
+  // considere la llamada parte de un "user gesture" activo, y en este
+  // flujo hay varios `await` (hash, Firestore, sellado) entre el clic
+  // del operador y este punto, lo que hace que el navegador la bloquee
+  // con "Must be handling a user gesture to show a file picker."
+  // La descarga vía <a download> no tiene esa restricción.
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
