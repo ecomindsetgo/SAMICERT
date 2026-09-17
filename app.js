@@ -1015,15 +1015,21 @@ function nombreConSufijo(nombre) {
     : nombre.slice(0,idx) + "[F]" + nombre.slice(idx);
 }
 
-async function guardarResultado(bytesSalida,nombre) {
+async function guardarResultado(bytesSalida,nombre,handleDestino) {
   const blob = new Blob([bytesSalida],{type:"application/pdf"});
 
-  // Nota: se descartó showSaveFilePicker porque exige que el navegador
-  // considere la llamada parte de un "user gesture" activo, y en este
-  // flujo hay varios `await` (hash, Firestore, sellado) entre el clic
-  // del operador y este punto, lo que hace que el navegador la bloquee
-  // con "Must be handling a user gesture to show a file picker."
-  // La descarga vía <a download> no tiene esa restricción.
+  // Si ya se obtuvo un "handle" de showSaveFilePicker al inicio del clic
+  // (antes de las operaciones asíncronas de certificación), se usa aquí
+  // para escribir el archivo en la ubicación que el operador eligió.
+  if (handleDestino) {
+    const writable = await handleDestino.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return true;
+  }
+
+  // Respaldo para navegadores sin File System Access API (Firefox, Safari):
+  // descarga clásica a la carpeta de descargas del navegador.
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1039,6 +1045,41 @@ btnAplicar.addEventListener("click",async () => {
   if (!archivoSeleccionado || !usuarioActual) return;
 
   btnAplicar.disabled = true;
+
+  const nombreDestino = nombreConSufijo(archivoSeleccionado.name);
+
+  // ── Elegir ubicación de guardado ANTES de cualquier operación asíncrona ──
+  // showSaveFilePicker solo funciona mientras el navegador todavía reconoce
+  // el clic como un "user gesture" activo. Si se llama después de esperar
+  // el hash, la consulta a Firestore o el sellado del PDF, el navegador ya
+  // no lo considera parte del gesto y lo bloquea con:
+  // "Must be handling a user gesture to show a file picker."
+  // Por eso se pide aquí, de entrada, y se guarda el handle para escribir
+  // el archivo recién al final, cuando el PDF certificado esté listo.
+  let handleDestino = null;
+  if ("showSaveFilePicker" in window) {
+    try {
+      handleDestino = await window.showSaveFilePicker({
+        suggestedName: nombreDestino,
+        types: [{
+          description: "Documento PDF",
+          accept: { "application/pdf": [".pdf"] }
+        }]
+      });
+    } catch (err) {
+      btnAplicar.disabled = false;
+      if (err.name === "AbortError") {
+        // El operador cerró el selector de guardado sin elegir ubicación.
+        return;
+      }
+      console.error(err);
+      mostrarEstado(
+        "No se pudo abrir el selector de guardado. " + (err.message || ""),
+        "error"
+      );
+      return;
+    }
+  }
 
   // ── Revalidación en el momento exacto de certificar ──────────────────
   // No basta con la revisión hecha al cargar el archivo: entre ese momento
@@ -1110,7 +1151,7 @@ btnAplicar.addEventListener("click",async () => {
     };
 
     await setDoc(doc(db,"certificaciones",resultado.meta.id),registro);
-    await guardarResultado(resultado.bytesSalida,nombreConSufijo(archivoSeleccionado.name));
+    await guardarResultado(resultado.bytesSalida,nombreDestino,handleDestino);
 
     limpiarArchivo();
 
