@@ -1187,13 +1187,25 @@ async function guardarResultado(bytesSalida,nombre) {
    registro. Si el almacenamiento remoto falla (sin conexión, cuota, etc.),
    la certificación se completa igual y el campo almacenadoEnServidor
    queda en false para que quede constancia de que esa copia no existe. */
+function esperarConLimite(promesa, milisegundos, mensajeTimeout) {
+  let temporizador;
+  const limite = new Promise((_, reject) => {
+    temporizador = setTimeout(() => reject(new Error(mensajeTimeout)), milisegundos);
+  });
+  return Promise.race([promesa, limite]).finally(() => clearTimeout(temporizador));
+}
+
 async function subirPdfAStorage(bytes, certId) {
   const ruta = `certificaciones/${certId}.pdf`;
   try {
-    await uploadBytes(storageRef(storage, ruta), bytes, {
-      contentType: "application/pdf",
-      customMetadata: { certId }
-    });
+    await esperarConLimite(
+      uploadBytes(storageRef(storage, ruta), bytes, {
+        contentType: "application/pdf",
+        customMetadata: { certId }
+      }),
+      20000,
+      "Tiempo de espera agotado al subir el PDF a Storage (20s). Probablemente la red bloquea ese servidor."
+    );
     return { ok: true, ruta };
   } catch (err) {
     console.error("No se pudo subir el PDF a Storage:", err);
@@ -1259,16 +1271,9 @@ btnAplicar.addEventListener("click",async () => {
   renderLista();
 
   try {
-    mostrarEstado("[DIAGNÓSTICO] Paso 1 de 4: dibujando el sello y el código QR sobre el PDF…");
     const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
-
-    mostrarEstado("[DIAGNÓSTICO] Paso 2 de 4: calculando el código de huella (SHA-256)…");
     const sha256 = await calcularSHA256(resultado.bytesSalida);
-
-    mostrarEstado("[DIAGNÓSTICO] Paso 3 de 4: subiendo la copia del PDF al servidor (Firebase Storage)…");
     const subida = await subirPdfAStorage(resultado.bytesSalida, resultado.meta.id);
-
-    mostrarEstado("[DIAGNÓSTICO] Paso 4 de 4: guardando el registro de la certificación (Firestore)…");
 
     const registro = {
       ...resultado.meta,
