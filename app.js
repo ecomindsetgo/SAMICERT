@@ -6,11 +6,15 @@ import {
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, limit, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
 import { firebaseConfig, ADMIN_UID } from "./firebase-config.js";
 
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
 const db = getFirestore(appFirebase);
+const storage = getStorage(appFirebase);
 
 
 
@@ -1172,6 +1176,35 @@ async function guardarResultado(bytesSalida,nombre) {
   return true;
 }
 
+/* ── Almacenamiento del PDF final en Firebase Storage ─────────────────────
+   Antes de esto, el PDF certificado solo llegaba al disco del certificador
+   vía descarga del navegador; SAMICERT se quedaba únicamente con el hash y
+   los metadatos, no con el archivo. Si esa copia local se perdía, el
+   registro de Firestore quedaba sin el documento que acredita.
+
+   La subida se intenta SIEMPRE, pero nunca bloquea la certificación: el
+   acto legal ya ocurrió en cuanto se calculó el hash y se generó el
+   registro. Si el almacenamiento remoto falla (sin conexión, cuota, etc.),
+   la certificación se completa igual y el campo almacenadoEnServidor
+   queda en false para que quede constancia de que esa copia no existe. */
+async function subirPdfAStorage(bytes, certId) {
+  const ruta = `certificaciones/${certId}.pdf`;
+  try {
+    await uploadBytes(storageRef(storage, ruta), bytes, {
+      contentType: "application/pdf",
+      customMetadata: { certId }
+    });
+    return { ok: true, ruta };
+  } catch (err) {
+    console.error("No se pudo subir el PDF a Storage:", err);
+    return { ok: false, ruta: null, error: err.message || "error desconocido" };
+  }
+}
+
+async function obtenerUrlDescarga(ruta) {
+  return getDownloadURL(storageRef(storage, ruta));
+}
+
 btnAplicar.addEventListener("click",async () => {
   if (!archivoSeleccionado || !usuarioActual) return;
 
@@ -1228,6 +1261,7 @@ btnAplicar.addEventListener("click",async () => {
   try {
     const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
     const sha256 = await calcularSHA256(resultado.bytesSalida);
+    const subida = await subirPdfAStorage(resultado.bytesSalida, resultado.meta.id);
 
     const registro = {
       ...resultado.meta,
@@ -1242,8 +1276,10 @@ btnAplicar.addEventListener("click",async () => {
       zonaHoraria:"America/Lima",
       selloArchivo:USUARIOS_AUTORIZADOS[usuarioActual.uid].sello.replace("./",""),
       creadoEn:serverTimestamp(),
-      version:7,
-      estado:"certificado"
+      version:8,
+      estado:"certificado",
+      almacenadoEnServidor: subida.ok,
+      archivoStorage: subida.ok ? subida.ruta : null
     };
 
     await setDoc(doc(db,"certificaciones",resultado.meta.id),registro);
@@ -1251,7 +1287,13 @@ btnAplicar.addEventListener("click",async () => {
 
     limpiarArchivo();
 
-    if (duplicadosDetectados.length) {
+    if (!subida.ok) {
+      mostrarEstado(
+        "Certificación registrada y descargada correctamente. Aviso: no se pudo guardar una copia del PDF en el servidor (" +
+        subida.error + "). El registro y el hash sí quedaron guardados; conserve el archivo descargado.",
+        "error"
+      );
+    } else if (duplicadosDetectados.length) {
       mostrarEstado(
         "Recertificación registrada. Quedó constancia permanente del motivo y de los identificadores previos: " +
         duplicadosDetectados.map(c => c.registro.id || c.docId).join(", ") + "."
@@ -1294,7 +1336,16 @@ async function renderDetalleConsulta(registro) {
     <strong>Fecha / hora:</strong> ${escapeHtml(registro.fecha || "")} ${escapeHtml(registro.hora || "")}<br>
     <strong>Páginas certificadas:</strong> ${escapeHtml(paginas)} de ${escapeHtml(registro.totalPaginas || "")}<br>
     <strong>Estado:</strong> Certificación registrada${registro.esRecertificacion ? '<br><br><strong style="color:#b42318">⚠ RECERTIFICACIÓN</strong><br><strong>Motivo declarado:</strong> ' + escapeHtml(registro.motivoRecertificacion || "sin motivo registrado") + '<br><strong>Certificaciones previas del mismo documento:</strong> ' + escapeHtml((registro.certificacionesPrevias || []).join(", ")) : ""}
+    ${registro.archivoStorage
+      ? `<br><br><button type="button" class="btn-descargar-pdf" id="btnDescargarConsulta">⬇ Descargar PDF certificado</button>`
+      : `<br><br><span style="color:#94a3b8">Este registro no tiene copia del PDF almacenada en el servidor.</span>`}
   `;
+
+  if (registro.archivoStorage) {
+    $("btnDescargarConsulta").addEventListener("click", e =>
+      descargarPdfDeStorage(registro.archivoStorage, registro.id, e.currentTarget)
+    );
+  }
 
   $("resultadoConsulta").classList.remove("oculto");
   $("noEncontradoConsulta").classList.add("oculto");
@@ -1459,6 +1510,27 @@ function aplicarFiltrosHistorial() {
   renderHistorialPagina();
 }
 
+async function descargarPdfDeStorage(ruta, certId, boton) {
+  const textoOriginal = boton ? boton.textContent : null;
+  if (boton) { boton.disabled = true; boton.textContent = "…"; }
+  try {
+    const url = await obtenerUrlDescarga(ruta);
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.download = `${certId}[F].pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (err) {
+    console.error(err);
+    alert("No se pudo descargar el PDF almacenado. " + (err.message || ""));
+  } finally {
+    if (boton) { boton.disabled = false; boton.textContent = textoOriginal; }
+  }
+}
+
 function totalFoliosDe(registros) {
   return registros.reduce((suma, r) => suma + ((r.paginasCertificadas || []).length || 0), 0);
 }
@@ -1499,8 +1571,17 @@ function renderHistorialPagina() {
         <strong>${escapeHtml(r.certificadorNombre || "")}</strong><br>
         <span>${escapeHtml(r.certificadorEmail || "")}</span>
       </div>
+      <div class="history-descarga">
+        ${r.archivoStorage
+          ? `<button type="button" class="btn-descargar-pdf" data-ruta="${escapeHtml(r.archivoStorage)}" data-id="${escapeHtml(r.id)}">⬇ PDF</button>`
+          : `<span class="sin-archivo" title="Este registro no tiene copia del PDF en el servidor">— sin copia</span>`}
+      </div>
     </div>
   `).join("");
+
+  contenedor.querySelectorAll(".btn-descargar-pdf").forEach(btn =>
+    btn.addEventListener("click", () => descargarPdfDeStorage(btn.dataset.ruta, btn.dataset.id, btn))
+  );
 
   paginacion.classList.toggle("oculto", totalPaginas <= 1);
   $("histPaginaIndicador").textContent = `Página ${historialPaginaActual} de ${totalPaginas}`;
@@ -1554,6 +1635,8 @@ function formatoFechaRegistro(r) {
   return `${r.fecha || ""} ${r.hora || ""}`.trim();
 }
 
+let adminRegistrosCache = [];
+
 async function cargarAdministracion() {
   if (!esAdministradorActual) return;
   const contenedor = $("adminLista");
@@ -1565,6 +1648,7 @@ async function cargarAdministracion() {
     const snap = await getDocs(collection(db,"certificaciones"));
     const registros = snap.docs.map(d => ({...d.data(), id:d.id}))
       .sort((a,b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0));
+    adminRegistrosCache = registros;
 
     if (!registros.length) {
       contenedor.innerHTML = '<div class="empty">No hay certificaciones registradas.</div>';
@@ -1576,7 +1660,7 @@ async function cargarAdministracion() {
       <div style="overflow:auto">
         <table class="admin-table">
           <thead><tr>
-            <th></th><th>ID</th><th>Archivo</th><th>Fecha</th><th>Certificador</th>
+            <th></th><th>ID</th><th>Archivo</th><th>Fecha</th><th>Certificador</th><th>PDF</th>
           </tr></thead>
           <tbody>
             ${registros.map(r => `
@@ -1587,6 +1671,10 @@ async function cargarAdministracion() {
                     <span style="color:#64748b">${escapeHtml((r.paginasCertificadas || []).length)} página(s)</span></td>
                 <td>${escapeHtml(formatoFechaRegistro(r))}</td>
                 <td>${escapeHtml(r.certificadorNombre || r.certificadorEmail || "")}</td>
+                <td>${r.archivoStorage
+                    ? `<button type="button" class="btn-descargar-pdf" data-ruta="${escapeHtml(r.archivoStorage)}" data-id="${escapeHtml(r.id)}">⬇</button>`
+                    : `<span style="color:#94a3b8" title="Sin copia en el servidor">—</span>`}
+                </td>
               </tr>
             `).join("")}
           </tbody>
@@ -1594,6 +1682,9 @@ async function cargarAdministracion() {
       </div>`;
     contenedor.querySelectorAll(".admin-check").forEach(c =>
       c.addEventListener("change", actualizarBotonEliminarAdmin)
+    );
+    contenedor.querySelectorAll(".btn-descargar-pdf").forEach(btn =>
+      btn.addEventListener("click", () => descargarPdfDeStorage(btn.dataset.ruta, btn.dataset.id, btn))
     );
     actualizarBotonEliminarAdmin();
     estado.textContent = `${registros.length} registro(s)`;
@@ -1669,7 +1760,19 @@ async function eliminarSeleccionadosAdmin() {
   btn.disabled = true;
 
   try {
-    for (const id of ids) await deleteDoc(doc(db,"certificaciones",id));
+    for (const id of ids) {
+      const registro = adminRegistrosCache.find(r => r.id === id);
+      await deleteDoc(doc(db,"certificaciones",id));
+      if (registro?.archivoStorage) {
+        try {
+          await deleteObject(storageRef(storage, registro.archivoStorage));
+        } catch (errStorage) {
+          // El registro ya se eliminó; que falte borrar el archivo en Storage
+          // (por ejemplo si ya no existe) no debe bloquear la operación.
+          console.error(`No se pudo eliminar el PDF de Storage para ${id}:`, errStorage);
+        }
+      }
+    }
     estado.textContent = `Se eliminaron ${ids.length} registro(s).`;
     await cargarAdministracion();
     await cargarHistorial();
