@@ -1259,9 +1259,16 @@ btnAplicar.addEventListener("click",async () => {
   renderLista();
 
   try {
+    mostrarEstado("[DIAGNÓSTICO] Paso 1 de 4: dibujando el sello y el código QR sobre el PDF…");
     const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
+
+    mostrarEstado("[DIAGNÓSTICO] Paso 2 de 4: calculando el código de huella (SHA-256)…");
     const sha256 = await calcularSHA256(resultado.bytesSalida);
+
+    mostrarEstado("[DIAGNÓSTICO] Paso 3 de 4: subiendo la copia del PDF al servidor (Firebase Storage)…");
     const subida = await subirPdfAStorage(resultado.bytesSalida, resultado.meta.id);
+
+    mostrarEstado("[DIAGNÓSTICO] Paso 4 de 4: guardando el registro de la certificación (Firestore)…");
 
     const registro = {
       ...resultado.meta,
