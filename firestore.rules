@@ -31,17 +31,7 @@ service cloud.firestore {
     }
 
     match /certificaciones/{certificacionId} {
-      // "get" (documento puntual, por su ID exacto) es público: es lo que
-      // usa la página de verificación (verificar.html) a la que apunta el
-      // QR impreso en la carátula. Conocer el ID no es un secreto: está
-      // impreso en el propio documento certificado.
-      //
-      // "list" (recorrer/consultar la colección completa) sigue exigiendo
-      // sesión de certificador o administrador. Sin esta separación, abrir
-      // "read" completo habilitaría además enumerar todas las
-      // certificaciones sin autenticarse, que es lo que NO se quiere.
-      allow get: if true;
-      allow list: if esAdministrador() || esCertificador();
+      allow read: if esAdministrador() || esCertificador();
 
       allow create: if esCertificador()
         && request.resource.data.certificadorUid == request.auth.uid;

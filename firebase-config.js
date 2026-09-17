@@ -1,6 +1,3 @@
-
-
-
 export const firebaseConfig = {
   apiKey: "AIzaSyCH2l988fQstxcyeYkIwj7LJAWThGwj1dc",
   authDomain: "samicert-b8175.firebaseapp.com",
