@@ -6,11 +6,15 @@ import {
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, limit, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
 import { firebaseConfig, ADMIN_UID } from "./firebase-config.js";
 
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
 const db = getFirestore(appFirebase);
+const storage = getStorage(appFirebase);
 
 
 
@@ -895,6 +899,119 @@ function dibujarSelloEnEsquina(pagina, imagen, esquina, tamano, margen, rotacion
   };
 }
 
+/* ── Página inicial de certificación con QR de consulta pública ──────────
+   Se genera el QR como vectores (rectángulos) directos en el PDF, con la
+   librería qrcode-generator (window.qrcode). No requiere canvas ni imagen
+   embebida: el resultado es nítido a cualquier resolución de impresión y
+   no depende de conexión a internet en el momento de certificar. */
+
+const DOMINIO_PUBLICO = "https://samicert.ecomindsetgo.com";
+
+function urlConsultaPublica(certId) {
+  return `${DOMINIO_PUBLICO}/verificar.html?id=${encodeURIComponent(certId)}`;
+}
+
+function generarModulosQr(texto) {
+  const qr = qrcode(0, "M"); // 0 = versión automática según longitud del texto
+  qr.addData(texto);
+  qr.make();
+  const n = qr.getModuleCount();
+  const modulos = [];
+  for (let fila = 0; fila < n; fila++) {
+    const linea = [];
+    for (let col = 0; col < n; col++) linea.push(qr.isDark(fila, col));
+    modulos.push(linea);
+  }
+  return modulos;
+}
+
+function dibujarQrVectorial(pagina, modulos, { x, y, tamano, rgbColor }) {
+  const n = modulos.length;
+  const lado = tamano / n;
+  // margen blanco (quiet zone) ya se resuelve dejando el propio cuadro sin
+  // fondo oscuro alrededor; el llamador debe reservar el espacio.
+  for (let fila = 0; fila < n; fila++) {
+    for (let col = 0; col < n; col++) {
+      if (!modulos[fila][col]) continue;
+      pagina.drawRectangle({
+        x: x + col * lado,
+        y: y + (n - fila - 1) * lado, // el eje Y del PDF crece hacia arriba
+        width: lado,
+        height: lado,
+        color: rgbColor
+      });
+    }
+  }
+}
+
+async function agregarPaginaCertificacion(pdfDoc, datos) {
+  const { rgb, StandardFonts } = PDFLib;
+  const fuenteTitulo = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fuenteTexto = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const pagina = pdfDoc.insertPage(0, [595.28, 841.89]); // A4 en puntos
+  const { width, height } = pagina.getSize();
+  const margenX = 64;
+  const azul = rgb(0.12, 0.22, 0.4);
+  const gris = rgb(0.4, 0.4, 0.4);
+  const negro = rgb(0.1, 0.1, 0.1);
+
+  let y = height - 100;
+  pagina.drawText("CORTE SUPERIOR DE JUSTICIA DEL SANTA", { x: margenX, y, size: 12, font: fuenteTitulo, color: azul });
+  y -= 16;
+  pagina.drawText("Línea de Producción de Microformas Digitales (LPMD)", { x: margenX, y, size: 9.5, font: fuenteTexto, color: gris });
+
+  y -= 46;
+  pagina.drawText("DOCUMENTO CERTIFICADO", { x: margenX, y, size: 19, font: fuenteTitulo, color: azul });
+
+  y -= 44;
+  const filas = [
+    ["Documento certificado por:", datos.nombreCertificador],
+    ["Total de páginas:", String(datos.totalPaginas)],
+    ["Total de folios certificados:", String(datos.totalFolios)],
+    ["Código de certificación:", datos.certId],
+    ["Fecha y hora:", `${datos.fecha}  ${datos.hora}`]
+  ];
+  filas.forEach(([etiqueta, valor]) => {
+    pagina.drawText(etiqueta, { x: margenX, y, size: 11.5, font: fuenteTexto, color: negro });
+    const anchoEtiqueta = fuenteTexto.widthOfTextAtSize(etiqueta + "  ", 11.5);
+    pagina.drawText(valor, { x: margenX + anchoEtiqueta, y, size: 11.5, font: fuenteTitulo, color: negro });
+    y -= 22;
+  });
+
+  y -= 28;
+  pagina.drawLine({ start: { x: margenX, y }, end: { x: width - margenX, y }, thickness: 0.75, color: rgb(0.8, 0.8, 0.8) });
+
+  // ── QR y mensaje de consulta ──
+  const tamanoQr = 118;
+  const qrX = width - margenX - tamanoQr;
+  const qrY = y - tamanoQr - 30;
+
+  const modulos = generarModulosQr(datos.urlConsulta);
+  dibujarQrVectorial(pagina, modulos, { x: qrX, y: qrY, tamano: tamanoQr, rgbColor: negro });
+  pagina.drawText(datos.certId, {
+    x: qrX, y: qrY - 13, size: 8, font: fuenteTexto, color: gris
+  });
+
+  // No se imprime la URL completa con parámetros: una dirección larga sin
+  // espacios no se ajusta al ancho de columna (pdf-lib solo corta líneas en
+  // espacios) y una persona no va a transcribirla a mano de todos modos.
+  // Se muestra el dominio corto para visitar, y el código de certificación
+  // (ya impreso arriba) es lo que la persona ingresa allí manualmente.
+  const anchoMensaje = qrX - margenX - 20;
+  pagina.drawText("Puede consultar la validez de este documento", { x: margenX, y: y - 40, size: 11, font: fuenteTexto, color: negro, maxWidth: anchoMensaje });
+  pagina.drawText("escaneando el código QR, o ingresando a:", { x: margenX, y: y - 58, size: 11, font: fuenteTexto, color: negro, maxWidth: anchoMensaje });
+  pagina.drawText(DOMINIO_PUBLICO.replace(/^https?:\/\//, ""), { x: margenX, y: y - 80, size: 13, font: fuenteTitulo, color: rgb(0.05, 0.32, 0.6) });
+  pagina.drawText("e ingresando el código de certificación indicado arriba.", { x: margenX, y: y - 98, size: 9.5, font: fuenteTexto, color: gris, maxWidth: anchoMensaje });
+
+  pagina.drawText(
+    "Este documento consta de una carátula de certificación y del contenido original. La numeración de folios certificados no incluye esta carátula.",
+    { x: margenX, y: 70, size: 8.5, font: fuenteTexto, color: gris, maxWidth: width - margenX * 2, lineHeight: 11 }
+  );
+
+  return pagina;
+}
+
 async function aplicarSelloAUnPdf(file) {
   if (!selloBytes || !selloBytes.length) {
     throw new Error("El sello automático de este usuario no está disponible.");
@@ -995,6 +1112,20 @@ async function aplicarSelloAUnPdf(file) {
     });
   });
 
+  // La carátula se agrega DESPUÉS de sellar todas las páginas originales,
+  // para que la numeración de folios y la rotación se calculen siempre
+  // sobre el documento original y no se corran por la portada.
+  const urlConsulta = urlConsultaPublica(certId);
+  await agregarPaginaCertificacion(pdfDoc, {
+    nombreCertificador: perfilActual?.nombre || usuarioActual?.displayName || usuarioActual?.email || "Certificador",
+    totalPaginas: paginas.length,
+    totalFolios: paginasSeleccionadas.size,
+    certId,
+    fecha,
+    hora,
+    urlConsulta
+  });
+
   return {
     bytesSalida: await pdfDoc.save(),
     meta: {
@@ -1003,7 +1134,8 @@ async function aplicarSelloAUnPdf(file) {
       hora,
       archivoOriginal: file.name,
       paginasCertificadas: Array.from(paginasSeleccionadas).sort((a,b)=>a-b),
-      totalPaginas: paginas.length
+      totalPaginas: paginas.length,
+      urlConsulta
     }
   };
 }
@@ -1042,6 +1174,47 @@ async function guardarResultado(bytesSalida,nombre) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url),2000);
   return true;
+}
+
+/* ── Almacenamiento del PDF final en Firebase Storage ─────────────────────
+   Antes de esto, el PDF certificado solo llegaba al disco del certificador
+   vía descarga del navegador; SAMICERT se quedaba únicamente con el hash y
+   los metadatos, no con el archivo. Si esa copia local se perdía, el
+   registro de Firestore quedaba sin el documento que acredita.
+
+   La subida se intenta SIEMPRE, pero nunca bloquea la certificación: el
+   acto legal ya ocurrió en cuanto se calculó el hash y se generó el
+   registro. Si el almacenamiento remoto falla (sin conexión, cuota, etc.),
+   la certificación se completa igual y el campo almacenadoEnServidor
+   queda en false para que quede constancia de que esa copia no existe. */
+function esperarConLimite(promesa, milisegundos, mensajeTimeout) {
+  let temporizador;
+  const limite = new Promise((_, reject) => {
+    temporizador = setTimeout(() => reject(new Error(mensajeTimeout)), milisegundos);
+  });
+  return Promise.race([promesa, limite]).finally(() => clearTimeout(temporizador));
+}
+
+async function subirPdfAStorage(bytes, certId) {
+  const ruta = `certificaciones/${certId}.pdf`;
+  try {
+    await esperarConLimite(
+      uploadBytes(storageRef(storage, ruta), bytes, {
+        contentType: "application/pdf",
+        customMetadata: { certId }
+      }),
+      20000,
+      "Tiempo de espera agotado al subir el PDF a Storage (20s). Probablemente la red bloquea ese servidor."
+    );
+    return { ok: true, ruta };
+  } catch (err) {
+    console.error("No se pudo subir el PDF a Storage:", err);
+    return { ok: false, ruta: null, error: err.message || "error desconocido" };
+  }
+}
+
+async function obtenerUrlDescarga(ruta) {
+  return getDownloadURL(storageRef(storage, ruta));
 }
 
 btnAplicar.addEventListener("click",async () => {
@@ -1100,6 +1273,11 @@ btnAplicar.addEventListener("click",async () => {
   try {
     const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
     const sha256 = await calcularSHA256(resultado.bytesSalida);
+    // Subida a Firebase Storage deshabilitada temporalmente: la red institucional
+    // bloquea ese servidor y dejaba la certificación esperando indefinidamente.
+    // El PDF certificado se sigue guardando localmente en la PC del certificador
+    // mediante guardarResultado() más abajo; eso no depende de esto.
+    const subida = { ok: false, ruta: null, error: "Guardado en servidor deshabilitado temporalmente." };
 
     const registro = {
       ...resultado.meta,
@@ -1114,8 +1292,10 @@ btnAplicar.addEventListener("click",async () => {
       zonaHoraria:"America/Lima",
       selloArchivo:USUARIOS_AUTORIZADOS[usuarioActual.uid].sello.replace("./",""),
       creadoEn:serverTimestamp(),
-      version:7,
-      estado:"certificado"
+      version:8,
+      estado:"certificado",
+      almacenadoEnServidor: subida.ok,
+      archivoStorage: subida.ok ? subida.ruta : null
     };
 
     await setDoc(doc(db,"certificaciones",resultado.meta.id),registro);
@@ -1123,7 +1303,12 @@ btnAplicar.addEventListener("click",async () => {
 
     limpiarArchivo();
 
-    if (duplicadosDetectados.length) {
+    if (!subida.ok) {
+      mostrarEstado(
+        "Certificación registrada correctamente y descargada a este equipo. " +
+        "(La copia adicional en el servidor está deshabilitada por ahora; el registro, el hash y el PDF descargado son válidos igual.)"
+      );
+    } else if (duplicadosDetectados.length) {
       mostrarEstado(
         "Recertificación registrada. Quedó constancia permanente del motivo y de los identificadores previos: " +
         duplicadosDetectados.map(c => c.registro.id || c.docId).join(", ") + "."
@@ -1166,7 +1351,16 @@ async function renderDetalleConsulta(registro) {
     <strong>Fecha / hora:</strong> ${escapeHtml(registro.fecha || "")} ${escapeHtml(registro.hora || "")}<br>
     <strong>Páginas certificadas:</strong> ${escapeHtml(paginas)} de ${escapeHtml(registro.totalPaginas || "")}<br>
     <strong>Estado:</strong> Certificación registrada${registro.esRecertificacion ? '<br><br><strong style="color:#b42318">⚠ RECERTIFICACIÓN</strong><br><strong>Motivo declarado:</strong> ' + escapeHtml(registro.motivoRecertificacion || "sin motivo registrado") + '<br><strong>Certificaciones previas del mismo documento:</strong> ' + escapeHtml((registro.certificacionesPrevias || []).join(", ")) : ""}
+    ${registro.archivoStorage
+      ? `<br><br><button type="button" class="btn-descargar-pdf" id="btnDescargarConsulta">⬇ Descargar PDF certificado</button>`
+      : `<br><br><span style="color:#94a3b8">Este registro no tiene copia del PDF almacenada en el servidor.</span>`}
   `;
+
+  if (registro.archivoStorage) {
+    $("btnDescargarConsulta").addEventListener("click", e =>
+      descargarPdfDeStorage(registro.archivoStorage, registro.id, e.currentTarget)
+    );
+  }
 
   $("resultadoConsulta").classList.remove("oculto");
   $("noEncontradoConsulta").classList.add("oculto");
@@ -1331,6 +1525,27 @@ function aplicarFiltrosHistorial() {
   renderHistorialPagina();
 }
 
+async function descargarPdfDeStorage(ruta, certId, boton) {
+  const textoOriginal = boton ? boton.textContent : null;
+  if (boton) { boton.disabled = true; boton.textContent = "…"; }
+  try {
+    const url = await obtenerUrlDescarga(ruta);
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.download = `${certId}[F].pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (err) {
+    console.error(err);
+    alert("No se pudo descargar el PDF almacenado. " + (err.message || ""));
+  } finally {
+    if (boton) { boton.disabled = false; boton.textContent = textoOriginal; }
+  }
+}
+
 function totalFoliosDe(registros) {
   return registros.reduce((suma, r) => suma + ((r.paginasCertificadas || []).length || 0), 0);
 }
@@ -1371,8 +1586,17 @@ function renderHistorialPagina() {
         <strong>${escapeHtml(r.certificadorNombre || "")}</strong><br>
         <span>${escapeHtml(r.certificadorEmail || "")}</span>
       </div>
+      <div class="history-descarga">
+        ${r.archivoStorage
+          ? `<button type="button" class="btn-descargar-pdf" data-ruta="${escapeHtml(r.archivoStorage)}" data-id="${escapeHtml(r.id)}">⬇ PDF</button>`
+          : `<span class="sin-archivo" title="Este registro no tiene copia del PDF en el servidor">— sin copia</span>`}
+      </div>
     </div>
   `).join("");
+
+  contenedor.querySelectorAll(".btn-descargar-pdf").forEach(btn =>
+    btn.addEventListener("click", () => descargarPdfDeStorage(btn.dataset.ruta, btn.dataset.id, btn))
+  );
 
   paginacion.classList.toggle("oculto", totalPaginas <= 1);
   $("histPaginaIndicador").textContent = `Página ${historialPaginaActual} de ${totalPaginas}`;
@@ -1426,6 +1650,8 @@ function formatoFechaRegistro(r) {
   return `${r.fecha || ""} ${r.hora || ""}`.trim();
 }
 
+let adminRegistrosCache = [];
+
 async function cargarAdministracion() {
   if (!esAdministradorActual) return;
   const contenedor = $("adminLista");
@@ -1437,6 +1663,7 @@ async function cargarAdministracion() {
     const snap = await getDocs(collection(db,"certificaciones"));
     const registros = snap.docs.map(d => ({...d.data(), id:d.id}))
       .sort((a,b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0));
+    adminRegistrosCache = registros;
 
     if (!registros.length) {
       contenedor.innerHTML = '<div class="empty">No hay certificaciones registradas.</div>';
@@ -1448,7 +1675,7 @@ async function cargarAdministracion() {
       <div style="overflow:auto">
         <table class="admin-table">
           <thead><tr>
-            <th></th><th>ID</th><th>Archivo</th><th>Fecha</th><th>Certificador</th>
+            <th></th><th>ID</th><th>Archivo</th><th>Fecha</th><th>Certificador</th><th>PDF</th>
           </tr></thead>
           <tbody>
             ${registros.map(r => `
@@ -1459,6 +1686,10 @@ async function cargarAdministracion() {
                     <span style="color:#64748b">${escapeHtml((r.paginasCertificadas || []).length)} página(s)</span></td>
                 <td>${escapeHtml(formatoFechaRegistro(r))}</td>
                 <td>${escapeHtml(r.certificadorNombre || r.certificadorEmail || "")}</td>
+                <td>${r.archivoStorage
+                    ? `<button type="button" class="btn-descargar-pdf" data-ruta="${escapeHtml(r.archivoStorage)}" data-id="${escapeHtml(r.id)}">⬇</button>`
+                    : `<span style="color:#94a3b8" title="Sin copia en el servidor">—</span>`}
+                </td>
               </tr>
             `).join("")}
           </tbody>
@@ -1466,6 +1697,9 @@ async function cargarAdministracion() {
       </div>`;
     contenedor.querySelectorAll(".admin-check").forEach(c =>
       c.addEventListener("change", actualizarBotonEliminarAdmin)
+    );
+    contenedor.querySelectorAll(".btn-descargar-pdf").forEach(btn =>
+      btn.addEventListener("click", () => descargarPdfDeStorage(btn.dataset.ruta, btn.dataset.id, btn))
     );
     actualizarBotonEliminarAdmin();
     estado.textContent = `${registros.length} registro(s)`;
@@ -1541,7 +1775,19 @@ async function eliminarSeleccionadosAdmin() {
   btn.disabled = true;
 
   try {
-    for (const id of ids) await deleteDoc(doc(db,"certificaciones",id));
+    for (const id of ids) {
+      const registro = adminRegistrosCache.find(r => r.id === id);
+      await deleteDoc(doc(db,"certificaciones",id));
+      if (registro?.archivoStorage) {
+        try {
+          await deleteObject(storageRef(storage, registro.archivoStorage));
+        } catch (errStorage) {
+          // El registro ya se eliminó; que falte borrar el archivo en Storage
+          // (por ejemplo si ya no existe) no debe bloquear la operación.
+          console.error(`No se pudo eliminar el PDF de Storage para ${id}:`, errStorage);
+        }
+      }
+    }
     estado.textContent = `Se eliminaron ${ids.length} registro(s).`;
     await cargarAdministracion();
     await cargarHistorial();
