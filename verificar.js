@@ -2,13 +2,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/fireba
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
-// Página pública: NO inicia sesión. Solo puede leer UN registro a la vez por su código
-// (regla `allow get` de Firestore); no puede listar ni buscar por otros campos.
+
 const db = getFirestore(initializeApp(firebaseConfig));
 
 const $ = id => document.getElementById(id);
 
-// Mismo alfabeto que generarIdCertificacion() en app.js (sin I, O, 0, 1)
+
 const FORMATO_ID = /^CERT-\d{4}-[A-HJ-NP-Z2-9]{12}$/;
 
 let registroActual = null;
