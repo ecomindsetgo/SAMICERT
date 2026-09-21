@@ -170,9 +170,7 @@ async function buscarCertificacionesPrevias(hashOrigen, nombreArchivo) {
   });
 }
 
-/* Determina si las páginas que se van a certificar ahora se solapan con las
-   ya certificadas antes. Certificar folios distintos del mismo expediente es
-   una operación legítima; repetir los mismos folios no lo es. */
+
 function paginasSolapadas(previas, actuales) {
   const set = new Set(previas || []);
   return (actuales || []).filter(p => set.has(p));
@@ -998,7 +996,7 @@ function envolverTexto(texto, fuente, size, maxAncho) {
 
 async function obtenerLogoInstitucional(pdfDoc) {
   try {
-    // cache: "no-cache" evita usar una versión antigua del logo guardada por el navegador
+  
     const resp = await fetch("./logo-institucional.png", { cache: "no-cache" });
     if (!resp.ok) throw new Error("sin logo institucional publicado");
     const bytes = new Uint8Array(await resp.arrayBuffer());
@@ -1016,7 +1014,7 @@ async function obtenerLogoInstitucional(pdfDoc) {
   }
 }
 
-// ── Carátula inicial del PDF final, según el diseño institucional ──────────
+
 async function crearPaginaCaratula(pdfDoc, resumen) {
   const { rgb, StandardFonts } = PDFLib;
   const fTitulo = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -1034,8 +1032,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
 
   const logo = await obtenerLogoInstitucional(pdfDoc);
   if (logo) {
-    // El logo institucional ya incluye la leyenda "Poder Judicial del Perú",
-    // por lo que no se repite el nombre de la institución debajo.
+  
     const logoAncho = 150, logoAlto = 112;
     const escala = Math.min(logoAncho / logo.width, logoAlto / logo.height);
     const wLogo = logo.width * escala, hLogo = logo.height * escala;
@@ -1048,7 +1045,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
     });
     y -= 34;
   } else {
-    // Sin logo publicado (o ilegible): marcador "PJ" + nombre de la institución
+ 
     const logoAncho = 96, logoAlto = 64;
     pagina.drawRectangle({
       x: width / 2 - logoAncho / 2, y: y - logoAlto, width: logoAncho, height: logoAlto,
@@ -1147,7 +1144,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
   });
   y -= 14;
 
-  const notaQR = "El código QR dirige al mismo enlace de consulta indicado en la presente constancia.";
+  const notaQR = "";
   pagina.drawText(notaQR, {
     x: width / 2 - fTexto.widthOfTextAtSize(notaQR, 8.5) / 2,
     y, size: 8.5, font: fTexto, color: gris
