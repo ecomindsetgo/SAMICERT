@@ -1105,7 +1105,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
     y -= 36;
   }
 
-  ["CONSTANCIA DE CERTIFICACIÓN", "DE COPIAS"].forEach(linea => {
+  ["CARGO DE COPIAS", "CERTIFICADAS"].forEach(linea => {
     pagina.drawText(linea, {
       x: width / 2 - fTitulo.widthOfTextAtSize(linea, 21) / 2,
       y, size: 21, font: fTitulo, color: azul
@@ -1114,7 +1114,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
   });
   y -= 14;
 
-  const parrafo = "Se deja constancia de que las copias certificadas que se adjuntan al presente documento han sido certificadas mediante el Sistema de Archivo y Manejo de Información para la Certificación de Documentos – SAMICERT.";
+  const parrafo = "Las copias certificadas que se adjuntan al presente documento han sido certificadas mediante el Sistema de Archivo y Manejo de Información para la Certificación de Documentos – SAMICERT.";
   for (const linea of envolverTexto(parrafo, fTexto, 10.5, anchoUtil)) {
     pagina.drawText(linea, { x: margenX, y, size: 10.5, font: fTexto, color: textoInk });
     y -= 15.5;
@@ -1125,13 +1125,19 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
     ["CERTIFICADOR:", resumen.certificadorNombre],
     ["FECHA DE CERTIFICACIÓN:", `${resumen.fecha} – ${resumen.hora}`],
     ["CÓDIGO DE CERTIFICACIÓN:", resumen.certId],
-    ["CANTIDAD TOTAL DE FOLIOS:", String(resumen.totalPaginas)],
-    ["CANTIDAD DE FOLIOS CERTIFICADOS:", String(resumen.totalCertificadas)]
+    ["TOTAL DE FOLIOS:", String(resumen.totalPaginas)],
+    ["FOLIOS CERTIFICADOS:", String(resumen.totalCertificadas)]
   ];
   filas.forEach(([etiqueta, valor]) => {
     pagina.drawText(etiqueta, { x: margenX, y, size: 10, font: fTitulo, color: azul });
     pagina.drawText(String(valor), { x: margenX + 215, y, size: 10, font: fTexto, color: textoInk });
     y -= 20;
+  });
+
+  const notaEmision = "(DOCUMENTOS EMITIDOS POR LA ENTIDAD)";
+  pagina.drawText(notaEmision, {
+    x: width / 2 - fTitulo.widthOfTextAtSize(notaEmision, 9) / 2,
+    y, size: 9, font: fTitulo, color: azul
   });
   y -= 18;
 
@@ -1179,16 +1185,11 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
   });
   y -= 14;
 
-  const notaQR = "El código QR dirige al mismo enlace de consulta indicado en la presente constancia.";
-  pagina.drawText(notaQR, {
-    x: width / 2 - fTexto.widthOfTextAtSize(notaQR, 8.5) / 2,
-    y, size: 8.5, font: fTexto, color: gris
+  const piePagina = "SAMICERT · Sistema de Archivo y Manejo de Información para la Certificación de Documentos";
+  pagina.drawText(piePagina, {
+    x: width / 2 - fTexto.widthOfTextAtSize(piePagina, 7.5) / 2,
+    y: 40, size: 7.5, font: fTexto, color: gris
   });
-
-  pagina.drawText(
-    "SAMICERT · Sistema de Archivo y Manejo de Información para la Certificación de Documentos",
-    { x: margenX, y: 40, size: 7.5, font: fTexto, color: gris }
-  );
 }
 
 async function aplicarSelloAUnPdf(file) {
