@@ -5,8 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SAMICERT — Sistema de Archivo y Manejo de Información para la Certificación de Documentos</title>
 
+<script>
+  // Los enlaces/QR de consulta ya emitidos apuntaban a "/?consulta=ID": se envían a la página pública.
+  (function () {
+    var c = new URLSearchParams(window.location.search).get("consulta");
+    if (c) window.location.replace("verificar.html?consulta=" + encodeURIComponent(c));
+  })();
+</script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="qrcode.js"></script>
 
 <link rel="stylesheet" href="style.css">
 
@@ -55,17 +64,17 @@
     </div>
 
     <nav class="nav">
-      <button class="nav-btn active" data-page="inicio"><span class="nav-icon">⌂</span>Inicio</button>
-      <button class="nav-btn" data-page="certificar"><span class="nav-icon">▣</span>Certificar Documento</button>
-      <button class="nav-btn" data-page="verificar"><span class="nav-icon">✓</span>Verificar Documento</button>
-      <button class="nav-btn" data-page="historial"><span class="nav-icon">☷</span>Historial de Certificaciones</button>
-      <button class="nav-btn" data-page="acerca"><span class="nav-icon">ⓘ</span>Acerca de SAMICERT</button>
-      <button class="nav-btn" data-page="seguridad"><span class="nav-icon">🔒</span>Seguridad / Contraseña</button>
-      <button class="nav-btn oculto" id="navAdministracion" data-page="administracion"><span class="nav-icon">⚙</span>Administración</button>
+      <button class="nav-btn active" data-page="inicio"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9"/></svg></span>Inicio</button>
+      <button class="nav-btn" data-page="certificar"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="m9.5 14.5 2 2 4-4.5"/></svg></span>Certificar Documento</button>
+      <button class="nav-btn" data-page="verificar"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.2c0 4.6 3 7.9 7 9.3 4-1.4 7-4.7 7-9.3V6l-7-2.5Z"/><path d="m9 12 2 2 4-4.5"/></svg></span>Verificar Documento</button>
+      <button class="nav-btn" data-page="historial"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9a8.5 8.5 0 1 1 1 8.4"/><path d="M3.5 4.5v4.5H8"/><path d="M12 8.5v4l3 2"/></svg></span>Historial de Certificaciones</button>
+      <button class="nav-btn" data-page="acerca"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M12 11v5.3"/><circle cx="12" cy="8" r=".9" fill="currentColor" stroke="none"/></svg></span>Acerca de SAMICERT</button>
+      <button class="nav-btn" data-page="seguridad"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6"/><path d="M8.5 10.5V7a3.5 3.5 0 0 1 7 0v3.5"/><circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg></span>Seguridad / Contraseña</button>
+      <button class="nav-btn oculto" id="navAdministracion" data-page="administracion"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="15" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="9" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="16" cy="18" r="2"/></svg></span>Administración</button>
     </nav>
 
     <div class="sidebar-footer">
-      SAMICERT v2.0.0<br>
+      SAMICERT v2.1.0<br>
       Creado por Alfredo Raúl Cruzado Palacios<br>
       © 2026 Poder Judicial del Perú
     </div>
@@ -80,7 +89,7 @@
       </div>
 
       <div class="user-area">
-        <div class="avatar">●</div>
+        <div class="avatar"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c1-4 4-6 7.5-6s6.5 2 7.5 6"/></svg></div>
         <div class="user-info">
           <strong id="usuarioNombre">Usuario</strong>
           <span id="usuarioEmail">correo</span>
@@ -104,7 +113,7 @@
 
         <div class="cards">
           <div class="home-card card-green">
-            <div class="card-icon">▣</div>
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="m9.5 14.5 2 2 4-4.5"/></svg></div>
             <div>
               <h3>Certificar Documento</h3>
               <p>Seleccione un PDF, elija las páginas y aplique el sello de certificación. El sistema genera automáticamente el identificador y registra la huella SHA-256.</p>
@@ -113,7 +122,7 @@
           </div>
 
           <div class="home-card card-blue">
-            <div class="card-icon">✓</div>
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.2c0 4.6 3 7.9 7 9.3 4-1.4 7-4.7 7-9.3V6l-7-2.5Z"/><path d="m9 12 2 2 4-4.5"/></svg></div>
             <div>
               <h3>Verificar Documento</h3>
               <p>Verifique un documento certificado mediante su huella SHA-256. SAMICERT indicará quién realizó la certificación y sus datos de registro.</p>
@@ -122,7 +131,7 @@
           </div>
 
           <div class="home-card card-purple">
-            <div class="card-icon">↺</div>
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9a8.5 8.5 0 1 1 1 8.4"/><path d="M3.5 4.5v4.5H8"/><path d="M12 8.5v4l3 2"/></svg></div>
             <div>
               <h3>Historial de Certificaciones</h3>
               <p>Consulte las certificaciones registradas por ambos certificadores y revise el historial centralizado de SAMICERT.</p>
@@ -131,7 +140,7 @@
           </div>
 
           <div class="home-card card-orange">
-            <div class="card-icon">i</div>
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M12 11v5.3"/><circle cx="12" cy="8" r=".9" fill="currentColor" stroke="none"/></svg></div>
             <div>
               <h3>Acerca de SAMICERT</h3>
               <p>Conozca el propósito del sistema, su funcionamiento y las medidas utilizadas para conservar los registros de certificación.</p>
@@ -157,7 +166,7 @@
           <div class="panel-subtitle">El sello correspondiente al usuario que inició sesión se aplica automáticamente.</div>
 
           <div class="drop" id="drop">
-            <div class="icono">📄</div>
+            <div class="icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8L14.5 3Z"/><path d="M14.5 3v4.5A1.5 1.5 0 0 0 16 9h4.5"/><path d="M9 13h6M9 16.5h6M9 9.5h2"/></svg></div>
             <div class="txt1">Haz clic para seleccionar el PDF que deseas certificar</div>
             <div class="txt2">También puedes arrastrar y soltar un archivo PDF aquí</div>
           </div>
@@ -186,12 +195,12 @@
             <div class="visor-modal-bar">
               <div class="visor-modal-titulo" id="visorModalTitulo">Página</div>
               <div class="visor-modal-controles">
-                <button type="button" class="visor-modal-btn" id="btnZoomMenos">−</button>
+                <button type="button" class="visor-modal-btn" id="btnZoomMenos" aria-label="Reducir zoom"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
                 <span class="visor-modal-btn" id="visorZoomTexto">100%</span>
-                <button type="button" class="visor-modal-btn" id="btnZoomMas">+</button>
-                <button type="button" class="visor-modal-btn" id="btnZoomAjustar">Ajustar</button>
-                <button type="button" class="visor-modal-btn" id="btnRotarModal">↻ Rotar</button>
-                <button type="button" class="visor-modal-btn visor-modal-cerrar" id="btnCerrarVisorModal" aria-label="Cerrar">✕</button>
+                <button type="button" class="visor-modal-btn" id="btnZoomMas" aria-label="Aumentar zoom"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+                <button type="button" class="visor-modal-btn" id="btnZoomAjustar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></svg> Ajustar</button>
+                <button type="button" class="visor-modal-btn" id="btnRotarModal"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 3v5h-5"/></svg> Rotar</button>
+                <button type="button" class="visor-modal-btn visor-modal-cerrar" id="btnCerrarVisorModal" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
               </div>
             </div>
             <div class="visor-modal-area" id="visorModalArea">
@@ -265,7 +274,7 @@
         <div class="panel">
           <div class="history-toolbar">
             <div class="panel-title" style="margin:0">Certificaciones registradas</div>
-            <button class="btn-small" id="btnActualizarHistorial">Actualizar</button>
+            <button class="btn-small btn-icon" id="btnActualizarHistorial"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8 8 0 1 0 18 16"/><path d="M20 5v6h-6"/></svg> Actualizar</button>
           </div>
 
           <div class="history-filtros">
@@ -326,7 +335,7 @@
             no los archivos PDF.
           </div>
           <div class="admin-toolbar">
-            <button class="btn-green" id="btnCrearBackup">Generar respaldo</button>
+            <button class="btn-green btn-icon" id="btnCrearBackup"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg> Generar respaldo</button>
             <span class="admin-status" id="backupStatus"></span>
           </div>
         </div>

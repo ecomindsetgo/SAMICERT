@@ -31,7 +31,11 @@ service cloud.firestore {
     }
 
     match /certificaciones/{certificacionId} {
-      allow read: if esAdministrador() || esCertificador();
+      // Consulta pública (página verificar.html, enlace/QR de la constancia):
+      // cualquiera puede LEER un registro individual si conoce su código
+      // (12 caracteres aleatorios). Listar o buscar sigue reservado al personal.
+      allow get: if true;
+      allow list: if esAdministrador() || esCertificador();
 
       allow create: if esCertificador()
         && request.resource.data.certificadorUid == request.auth.uid;

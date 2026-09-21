@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Consulta de certificación de copias — SAMICERT</title>
+<link rel="stylesheet" href="verificar.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <img class="topbar-logo" src="logo-institucional.png" alt="Poder Judicial del Perú">
+    <div class="topbar-txt">
+      <div class="topbar-sam">SAMICERT</div>
+      <div class="topbar-sub">Consulta pública de certificación de copias</div>
+      <div class="topbar-inst">Corte Superior de Justicia del Santa · Archivo Desconcentrado</div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="card">
+    <h1>Verifique la autenticidad de una copia certificada</h1>
+    <p class="lead">
+      Ingrese el código de certificación que figura en la primera hoja (constancia) del documento,
+      o llegue directamente aquí escaneando su código QR.
+    </p>
+
+    <form id="formConsulta" autocomplete="off">
+      <label for="inputId">Código de certificación</label>
+      <div class="fila">
+        <input id="inputId" type="text" placeholder="CERT-2026-XXXXXXXXXXXX" maxlength="40"
+               spellcheck="false" autocapitalize="characters" required>
+        <button id="btnConsultar" class="btn" type="submit">Consultar</button>
+      </div>
+      <div id="errorFormato" class="aviso aviso-error oculto"></div>
+    </form>
+  </section>
+
+  <section id="cargando" class="card oculto">
+    <p class="cargando">Consultando el registro…</p>
+  </section>
+
+  <section id="noEncontrado" class="card resultado resultado-no oculto">
+    <div class="sello sello-no">✗</div>
+    <h2>No se encontró la certificación</h2>
+    <p>
+      El código consultado no figura en el registro de SAMICERT. Revise que esté escrito
+      exactamente como aparece en la constancia. Si el código es correcto y el problema persiste,
+      el documento no debe considerarse una copia certificada válida hasta ser confirmado
+      con el Archivo Desconcentrado.
+    </p>
+  </section>
+
+  <section id="errorConsulta" class="card resultado resultado-no oculto">
+    <div class="sello sello-warn">!</div>
+    <h2>No se pudo realizar la consulta</h2>
+    <p id="errorConsultaTxt"></p>
+  </section>
+
+  <section id="encontrado" class="oculto">
+    <div class="card resultado resultado-ok">
+      <div class="sello sello-ok">✓</div>
+      <h2>Certificación registrada</h2>
+      <p class="sub">El código consultado figura en el registro oficial de SAMICERT.</p>
+
+      <dl class="datos">
+        <dt>Código de certificación</dt><dd id="dId" class="mono"></dd>
+        <dt>Fecha y hora de certificación</dt><dd id="dFecha"></dd>
+        <dt>Certificado por</dt><dd id="dCertificador"></dd>
+        <dt>Folios certificados</dt><dd id="dFolios"></dd>
+        <dt>Estado</dt><dd id="dEstado"></dd>
+      </dl>
+
+      <div id="avisoRecert" class="aviso aviso-warn oculto"></div>
+    </div>
+
+    <div class="card">
+      <h2>Compruebe que su archivo no fue alterado</h2>
+      <p class="lead">
+        Seleccione el PDF certificado que usted recibió. El sistema calculará su huella digital
+        <strong>SHA-256</strong> en su propio equipo (el archivo no se envía a ningún servidor) y la comparará
+        con la huella registrada al momento de certificar.
+      </p>
+
+      <label class="subir" for="inputPdf">
+        <span id="subirTxt">Seleccionar PDF certificado</span>
+        <input id="inputPdf" type="file" accept="application/pdf,.pdf">
+      </label>
+
+      <div id="resultadoHash" class="aviso oculto"></div>
+
+      <p class="nota">
+        La entrega válida es siempre el archivo PDF digital. Una copia impresa o reescaneada
+        ya no conserva la huella digital y no puede comprobarse por este medio.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  SAMICERT · Sistema de Archivo y Manejo de Información para la Certificación de Documentos
+</footer>
+
+<script type="module" src="verificar.js"></script>
+</body>
+</html>

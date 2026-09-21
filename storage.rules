@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function esAdministrador() {
+      return request.auth != null &&
+        request.auth.uid == "OCsKdrDfB6h0Ey5RLjiWnvoOWqs1";
+    }
+
+    function esCertificador() {
+      return request.auth != null &&
+        (
+          request.auth.uid == "wBCSJ3XfHVaUZPLmC2yJddh5RXx1" ||
+          request.auth.uid == "4tdNYgErvlM7NB3hwP933avL3RT2"
+        );
+    }
+
+    // PDF finales certificados, respaldados como certificaciones/{ID}.pdf
+    match /certificaciones/{archivo} {
+      allow read: if esAdministrador() || esCertificador();
+      allow create: if esCertificador();
+      allow update: if false;
+      allow delete: if esAdministrador();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

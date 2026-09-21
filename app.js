@@ -6,11 +6,26 @@ import {
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, limit, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+import {
+  getStorage, ref as storageRef, deleteObject
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
 import { firebaseConfig, ADMIN_UID } from "./firebase-config.js";
 
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
 const db = getFirestore(appFirebase);
+const storage = getStorage(appFirebase);
+
+// ── Íconos SVG en línea (look profesional, reemplazan a los emojis/glifos) ──
+const ICONOS = {
+  lupa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.35-4.35"/></svg>',
+  rotar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 3v5h-5"/></svg>',
+  ver: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  descargar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>',
+  nube: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18.5a4 4 0 0 1-.5-7.97A5 5 0 0 1 16 8.5a3.75 3.75 0 0 1 1 7.38"/><path d="M9.5 18.5h7.5"/></svg>',
+  actualizar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8 8 0 1 0 18 16"/><path d="M20 5v6h-6"/></svg>',
+  candado: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6"/><path d="M8.5 10.5V7a3.5 3.5 0 0 1 7 0v3.5"/><circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg>'
+};
 
 
 
@@ -33,6 +48,20 @@ const passwordForm = $("passwordForm");
 const btnGuardarPassword = $("btnGuardarPassword");
 const btnLimpiarPassword = $("btnLimpiarPassword");
 const passwordMessage = $("passwordMessage");
+
+// Si se llegó desde un enlace/QR de consulta (?consulta=ID), se avisa en la
+// pantalla de acceso; tras iniciar sesión, onAuthStateChanged reabre esa
+// consulta automáticamente en la sección "Verificar Documento".
+const idConsultaInicial = new URLSearchParams(window.location.search).get("consulta");
+if (idConsultaInicial) {
+  const parrafoLogin = document.querySelector(".login-card p");
+  if (parrafoLogin) {
+    parrafoLogin.insertAdjacentHTML(
+      "afterend",
+      `<div class="login-consulta-aviso">Enlace de consulta de certificación: <strong>${escapeHtml(idConsultaInicial.trim().toUpperCase())}</strong>. Inicie sesión para ver el detalle.</div>`
+    );
+  }
+}
 
 const drop = $("drop");
 const btnAplicar = $("btnAplicar");
@@ -386,14 +415,14 @@ async function cargarVisorPaginas(file) {
       const lupa = document.createElement("button");
       lupa.type = "button";
       lupa.className = "visor-lupa";
-      lupa.innerHTML = "🔍";
+      lupa.innerHTML = ICONOS.lupa;
       lupa.title = "Ver página ampliada";
       lupa.setAttribute("aria-label", `Ampliar página ${numero}`);
 
       const rotar = document.createElement("button");
       rotar.type = "button";
       rotar.className = "visor-rotar";
-      rotar.innerHTML = "↻";
+      rotar.innerHTML = ICONOS.rotar;
       rotar.title = "Rotar página 90° — el giro queda guardado y se aplicará al PDF final (el archivo original no se modifica)";
       rotar.setAttribute("aria-label", `Rotar página ${numero} para el PDF final`);
 
@@ -526,7 +555,7 @@ function actualizarBadgeGiro(numero) {
   if (!giroEl) return;
   const giro = Number(rotacionesPagina.get(numero) || 0);
   if (giro) {
-    giroEl.textContent = `↻ ${giro}°`;
+    giroEl.innerHTML = `<span class="giro-icono">${ICONOS.rotar}</span> ${giro}°`;
     giroEl.classList.remove("oculto");
   } else {
     giroEl.textContent = "";
@@ -871,7 +900,11 @@ function pivoteParaRotar(centro, tamano, giroDeg) {
   return { x: centro.x - rx, y: centro.y - ry };
 }
 
-function dibujarSelloEnEsquina(pagina, imagen, esquina, tamano, margen, rotacionFinal) {
+// Calcula dónde va a caer el sello (esquina/pivote/giro) SIN dibujar nada todavía.
+// Esto permite dibujar primero los textos (fecha/hora/código/folio) y recién
+// después la imagen del sello encima, para que el texto quede detrás de la
+// firma/imagen y no compitiendo visualmente con ella.
+function calcularPosicionSello(pagina, esquina, tamano, margen, rotacionFinal) {
   const centro = centroSelloEnCoordenadasPdf(
     pagina, esquina, tamano, margen, rotacionFinal
   );
@@ -880,19 +913,270 @@ function dibujarSelloEnEsquina(pagina, imagen, esquina, tamano, margen, rotacion
   const giroSello = rot === 90 ? 90 : rot === 180 ? 180 : rot === 270 ? 270 : 0;
   const pivote = pivoteParaRotar(centro, tamano, giroSello);
 
-  pagina.drawImage(imagen, {
-    x: pivote.x,
-    y: pivote.y,
-    width: tamano,
-    height: tamano,
-    rotate: PDFLib.degrees(giroSello)
-  });
-
   return {
     x: pivote.x,
     y: pivote.y,
     giro: giroSello
   };
+}
+
+// Dibuja la imagen del sello en la posición ya calculada. Se llama DESPUÉS de
+// dibujar los textos, así la imagen queda por delante (encima) de ellos.
+function dibujarImagenSello(pagina, imagen, posicion, tamano) {
+  pagina.drawImage(imagen, {
+    x: posicion.x,
+    y: posicion.y,
+    width: tamano,
+    height: tamano,
+    rotate: PDFLib.degrees(posicion.giro)
+  });
+}
+
+// ── Utilidades para el código QR de la carátula (sin dependencias del DOM además del canvas) ──
+// Carga el emblema que va al centro del QR (logo-qr.png). Si no está o no se puede leer,
+// el QR se genera igual, sin emblema.
+async function cargarLogoParaQR() {
+  try {
+    const resp = await fetch("./logo-qr.png", { cache: "no-cache" });
+    if (!resp.ok) throw new Error("sin logo-qr.png publicado");
+    const blob = await resp.blob();
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("logo-qr.png ilegible")); };
+      img.src = url;
+    });
+  } catch (e) {
+    console.error("El QR se generará sin emblema central:", e);
+    return null;
+  }
+}
+
+async function generarQRDataUrl(texto, tamanoPx = 320) {
+  // Corrección de errores nivel "H" (~30 %): permite tapar el centro con el emblema
+  // y que el QR siga siendo legible.
+  const qr = qrcode(0, "H");
+  qr.addData(texto);
+  qr.make();
+  const count = qr.getModuleCount();
+  const cell = Math.max(1, Math.floor(tamanoPx / count));
+  const size = cell * count;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#0b1b2b";
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) ctx.fillRect(c * cell, r * cell, cell, cell);
+    }
+  }
+
+  const logo = await cargarLogoParaQR();
+  if (logo) {
+    // El emblema ocupa ~20 % del ancho del QR (≈4 % de su área) sobre un fondo blanco
+    const caja = Math.round(size * 0.20);
+    const escala = Math.min(caja / logo.width, caja / logo.height);
+    const w = Math.round(logo.width * escala), h = Math.round(logo.height * escala);
+    const margen = Math.max(3, Math.round(size * 0.015));
+    const cx = size / 2, cy = size / 2;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(Math.round(cx - w / 2 - margen), Math.round(cy - h / 2 - margen), w + margen * 2, h + margen * 2);
+    ctx.drawImage(logo, Math.round(cx - w / 2), Math.round(cy - h / 2), w, h);
+  }
+  return canvas.toDataURL("image/png");
+}
+
+function dataUrlABytes(dataUrl) {
+  const base64 = dataUrl.split(",")[1];
+  const binStr = atob(base64);
+  const bytes = new Uint8Array(binStr.length);
+  for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+  return bytes;
+}
+
+function envolverTexto(texto, fuente, size, maxAncho) {
+  const palabras = texto.split(/\s+/);
+  const lineas = [];
+  let actual = "";
+  for (const palabra of palabras) {
+    const prueba = actual ? actual + " " + palabra : palabra;
+    if (actual && fuente.widthOfTextAtSize(prueba, size) > maxAncho) {
+      lineas.push(actual);
+      actual = palabra;
+    } else {
+      actual = prueba;
+    }
+  }
+  if (actual) lineas.push(actual);
+  return lineas;
+}
+
+async function obtenerLogoInstitucional(pdfDoc) {
+  try {
+    // cache: "no-cache" evita usar una versión antigua del logo guardada por el navegador
+    const resp = await fetch("./logo-institucional.png", { cache: "no-cache" });
+    if (!resp.ok) throw new Error("sin logo institucional publicado");
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+
+    // Se detecta el formato real por los primeros bytes del archivo y no por su extensión:
+    // un JPEG guardado con nombre ".png" hacía fallar embedPng y se caía al marcador "PJ".
+    const esPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+    const esJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
+    if (esPng) return await pdfDoc.embedPng(bytes);
+    if (esJpg) return await pdfDoc.embedJpg(bytes);
+    throw new Error("formato de logo no reconocido (se esperaba PNG o JPG)");
+  } catch (e) {
+    console.error("No se pudo incluir el logo institucional en la carátula:", e);
+    return null;
+  }
+}
+
+// ── Carátula inicial del PDF final, según el diseño institucional ──────────
+async function crearPaginaCaratula(pdfDoc, resumen) {
+  const { rgb, StandardFonts } = PDFLib;
+  const fTitulo = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fTexto = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const pagina = pdfDoc.insertPage(0, [595.28, 841.89]);
+  const { width, height } = pagina.getSize();
+  const margenX = 64;
+  const anchoUtil = width - margenX * 2;
+  const azul = rgb(0.02, 0.14, 0.23);
+  const gris = rgb(0.38, 0.43, 0.49);
+  const textoInk = rgb(0.14, 0.19, 0.26);
+
+  let y = height - 58;
+
+  const logo = await obtenerLogoInstitucional(pdfDoc);
+  if (logo) {
+    // El logo institucional ya incluye la leyenda "Poder Judicial del Perú",
+    // por lo que no se repite el nombre de la institución debajo.
+    const logoAncho = 150, logoAlto = 112;
+    const escala = Math.min(logoAncho / logo.width, logoAlto / logo.height);
+    const wLogo = logo.width * escala, hLogo = logo.height * escala;
+    pagina.drawImage(logo, { x: width / 2 - wLogo / 2, y: y - hLogo, width: wLogo, height: hLogo });
+    y -= hLogo + 16;
+
+    pagina.drawText(resumen.organo, {
+      x: width / 2 - fTexto.widthOfTextAtSize(resumen.organo, 9.5) / 2,
+      y, size: 9.5, font: fTexto, color: gris
+    });
+    y -= 34;
+  } else {
+    // Sin logo publicado (o ilegible): marcador "PJ" + nombre de la institución
+    const logoAncho = 96, logoAlto = 64;
+    pagina.drawRectangle({
+      x: width / 2 - logoAncho / 2, y: y - logoAlto, width: logoAncho, height: logoAlto,
+      borderColor: gris, borderWidth: 1
+    });
+    const marca = "PJ";
+    pagina.drawText(marca, {
+      x: width / 2 - fTitulo.widthOfTextAtSize(marca, 22) / 2,
+      y: y - logoAlto / 2 - 8, size: 22, font: fTitulo, color: azul
+    });
+    y -= logoAlto + 18;
+
+    pagina.drawText(resumen.institucion, {
+      x: width / 2 - fTitulo.widthOfTextAtSize(resumen.institucion, 13) / 2,
+      y, size: 13, font: fTitulo, color: azul
+    });
+    y -= 17;
+    pagina.drawText(resumen.organo, {
+      x: width / 2 - fTexto.widthOfTextAtSize(resumen.organo, 9.5) / 2,
+      y, size: 9.5, font: fTexto, color: gris
+    });
+    y -= 36;
+  }
+
+  ["CONSTANCIA DE CERTIFICACIÓN", "DE COPIAS"].forEach(linea => {
+    pagina.drawText(linea, {
+      x: width / 2 - fTitulo.widthOfTextAtSize(linea, 21) / 2,
+      y, size: 21, font: fTitulo, color: azul
+    });
+    y -= 26;
+  });
+  y -= 14;
+
+  const parrafo = "Se deja constancia de que las copias certificadas que se adjuntan al presente documento han sido certificadas mediante el Sistema de Archivo y Manejo de Información para la Certificación de Documentos – SAMICERT.";
+  for (const linea of envolverTexto(parrafo, fTexto, 10.5, anchoUtil)) {
+    pagina.drawText(linea, { x: margenX, y, size: 10.5, font: fTexto, color: textoInk });
+    y -= 15.5;
+  }
+  y -= 20;
+
+  const filas = [
+    ["CERTIFICADOR:", resumen.certificadorNombre],
+    ["FECHA DE CERTIFICACIÓN:", `${resumen.fecha} – ${resumen.hora}`],
+    ["CÓDIGO DE CERTIFICACIÓN:", resumen.certId],
+    ["CANTIDAD TOTAL DE FOLIOS:", String(resumen.totalPaginas)],
+    ["CANTIDAD DE FOLIOS CERTIFICADOS:", String(resumen.totalCertificadas)]
+  ];
+  filas.forEach(([etiqueta, valor]) => {
+    pagina.drawText(etiqueta, { x: margenX, y, size: 10, font: fTitulo, color: azul });
+    pagina.drawText(String(valor), { x: margenX + 215, y, size: 10, font: fTexto, color: textoInk });
+    y -= 20;
+  });
+  y -= 18;
+
+  const tituloConsulta = "CONSULTA DE CERTIFICACIÓN";
+  pagina.drawText(tituloConsulta, {
+    x: width / 2 - fTitulo.widthOfTextAtSize(tituloConsulta, 13) / 2,
+    y, size: 13, font: fTitulo, color: azul
+  });
+  y -= 22;
+
+  const parrafo2 = "La información y los datos asociados a la presente certificación pueden ser consultados y verificados mediante el siguiente enlace:";
+  for (const linea of envolverTexto(parrafo2, fTexto, 10, anchoUtil)) {
+    pagina.drawText(linea, {
+      x: width / 2 - fTexto.widthOfTextAtSize(linea, 10) / 2,
+      y, size: 10, font: fTexto, color: textoInk
+    });
+    y -= 14;
+  }
+  y -= 6;
+
+  // El enlace es largo: se reduce el tamaño de letra solo si no cabe en la hoja
+  let tamUrl = 10.5;
+  const anchoUrl = fTitulo.widthOfTextAtSize(resumen.consultaUrl, tamUrl);
+  if (anchoUrl > width - 80) tamUrl = tamUrl * (width - 80) / anchoUrl;
+  pagina.drawText(resumen.consultaUrl, {
+    x: width / 2 - fTitulo.widthOfTextAtSize(resumen.consultaUrl, tamUrl) / 2,
+    y, size: tamUrl, font: fTitulo, color: rgb(0.09, 0.34, 0.6)
+  });
+  y -= 28;
+
+  try {
+    const qrBytes = dataUrlABytes(await generarQRDataUrl(resumen.consultaUrl, 480));
+    const qrImg = await pdfDoc.embedPng(qrBytes);
+    const qrTam = 130;
+    pagina.drawImage(qrImg, { x: width / 2 - qrTam / 2, y: y - qrTam, width: qrTam, height: qrTam });
+    y -= qrTam + 14;
+  } catch (e) {
+    console.error("No se pudo generar el código QR de la carátula:", e);
+    y -= 14;
+  }
+
+  const leyendaQR = "O ESCANEANDO EL CÓDIGO QR";
+  pagina.drawText(leyendaQR, {
+    x: width / 2 - fTitulo.widthOfTextAtSize(leyendaQR, 9.5) / 2,
+    y, size: 9.5, font: fTitulo, color: azul
+  });
+  y -= 14;
+
+  const notaQR = "El código QR dirige al mismo enlace de consulta indicado en la presente constancia.";
+  pagina.drawText(notaQR, {
+    x: width / 2 - fTexto.widthOfTextAtSize(notaQR, 8.5) / 2,
+    y, size: 8.5, font: fTexto, color: gris
+  });
+
+  pagina.drawText(
+    "SAMICERT · Sistema de Archivo y Manejo de Información para la Certificación de Documentos",
+    { x: margenX, y: 40, size: 7.5, font: fTexto, color: gris }
+  );
 }
 
 async function aplicarSelloAUnPdf(file) {
@@ -935,6 +1219,8 @@ async function aplicarSelloAUnPdf(file) {
   const fecha = fechaHoy();
   const hora = horaAhora();
   const certId = generarIdCertificacion();
+  const ordenCertificadas = Array.from(paginasSeleccionadas).sort((a,b)=>a-b);
+  const totalCertificadas = ordenCertificadas.length;
 
   paginas.forEach((pagina, indice) => {
     const n = indice + 1;
@@ -949,40 +1235,44 @@ async function aplicarSelloAUnPdf(file) {
 
     if (!paginasSeleccionadas.has(n)) return;
 
-    const sello = dibujarSelloEnEsquina(
-      pagina,
-      sellImage,
-      esquina,
-      tamano,
-      margen,
-      rotacionFinal
+    // 1) Se calcula dónde va a caer el sello, pero todavía no se dibuja la imagen.
+    const posSello = calcularPosicionSello(
+      pagina, esquina, tamano, margen, rotacionFinal
     );
+
+    const numeroFolio = ordenCertificadas.indexOf(n) + 1;
+    const textoFolio = `Página ${numeroFolio}/${totalCertificadas}`;
 
     const tamFuenteFecha = Math.max(6.5, tamano * 0.078);
     const tamFuenteHora = Math.max(4.2, tamFuenteFecha * 0.55);
     const tamFuenteId = Math.max(3.8, tamFuenteFecha * 0.48);
+    const tamFuenteFolio = tamFuenteId;
     const textos = [
       [fecha, tamFuenteFecha],
       [hora, tamFuenteHora],
-      [certId, tamFuenteId]
+      [certId, tamFuenteId],
+      [textoFolio, tamFuenteFolio]
     ];
 
     const ys = [
       tamano * 0.49,
       tamano * 0.49 - tamFuenteFecha * 0.85,
-      tamano * 0.49 - tamFuenteFecha * 1.55
+      tamano * 0.49 - tamFuenteFecha * 1.55,
+      tamano * 0.49 - tamFuenteFecha * 2.15
     ];
 
-    const radGiro = sello.giro * Math.PI / 180;
+    const radGiro = posSello.giro * Math.PI / 180;
     const cosGiro = Math.cos(radGiro);
     const sinGiro = Math.sin(radGiro);
 
+    // 2) Se dibujan primero los textos (fecha, hora, código y folio): quedan
+    //    "detrás" porque la imagen del sello se dibuja recién después, encima.
     textos.forEach(([texto, size], i) => {
       const ancho = fuente.widthOfTextAtSize(texto, size);
       const localX = tamano / 2 - ancho / 2;
       const localY = ys[i];
-      const px = sello.x + (cosGiro * localX - sinGiro * localY);
-      const py = sello.y + (sinGiro * localX + cosGiro * localY);
+      const px = posSello.x + (cosGiro * localX - sinGiro * localY);
+      const py = posSello.y + (sinGiro * localX + cosGiro * localY);
 
       pagina.drawText(texto, {
         x: px,
@@ -990,9 +1280,26 @@ async function aplicarSelloAUnPdf(file) {
         size,
         font: fuente,
         color: rgb(0.67, 0.14, 0.09),
-        rotate: PDFLib.degrees(sello.giro)
+        rotate: PDFLib.degrees(posSello.giro)
       });
     });
+
+    // 3) Recién ahora se dibuja la imagen del sello, por encima del texto.
+    //    En las zonas transparentes del PNG (fuera de la firma/tinta) el
+    //    texto sigue siendo visible; donde el sello es opaco, lo tapa.
+    dibujarImagenSello(pagina, sellImage, posSello, tamano);
+  });
+
+  await crearPaginaCaratula(pdfDoc, {
+    institucion: "PODER JUDICIAL DEL PERÚ",
+    organo: "Corte Superior de Justicia del Santa · Archivo Desconcentrado",
+    certificadorNombre: perfilActual?.nombre || usuarioActual?.displayName || usuarioActual?.email || "Usuario autorizado",
+    fecha,
+    hora,
+    certId,
+    totalPaginas: paginas.length,
+    totalCertificadas,
+    consultaUrl: `https://samicert.ecomindsetgo.com/verificar.html?consulta=${certId}`
   });
 
   return {
@@ -1002,7 +1309,7 @@ async function aplicarSelloAUnPdf(file) {
       fecha,
       hora,
       archivoOriginal: file.name,
-      paginasCertificadas: Array.from(paginasSeleccionadas).sort((a,b)=>a-b),
+      paginasCertificadas: ordenCertificadas,
       totalPaginas: paginas.length
     }
   };
@@ -1133,6 +1440,11 @@ btnAplicar.addEventListener("click",async () => {
     const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
     const sha256 = await calcularSHA256(resultado.bytesSalida);
 
+    // ── El PDF final NO se respalda en el sistema (Firebase Storage) ──────
+    // Por decisión operativa, el único ejemplar del PDF certificado queda
+    // en el equipo del certificador. El sistema solo conserva el registro
+    // (metadatos + SHA-256) en Firestore, para poder verificar integridad
+    // sin necesitar el archivo en sí.
     const registro = {
       ...resultado.meta,
       sha256,
@@ -1146,7 +1458,7 @@ btnAplicar.addEventListener("click",async () => {
       zonaHoraria:"America/Lima",
       selloArchivo:USUARIOS_AUTORIZADOS[usuarioActual.uid].sello.replace("./",""),
       creadoEn:serverTimestamp(),
-      version:7,
+      version:9,
       estado:"certificado"
     };
 
@@ -1158,11 +1470,13 @@ btnAplicar.addEventListener("click",async () => {
     if (duplicadosDetectados.length) {
       mostrarEstado(
         "Recertificación registrada. Quedó constancia permanente del motivo y de los identificadores previos: " +
-        duplicadosDetectados.map(c => c.registro.id || c.docId).join(", ") + "."
+        duplicadosDetectados.map(c => c.registro.id || c.docId).join(", ") + ". El PDF final quedó guardado únicamente en este equipo.",
+        "ok"
       );
     } else {
       mostrarEstado(
-        "Certificación registrada correctamente. El identificador y SHA-256 fueron almacenados automáticamente."
+        "Certificación registrada correctamente. El identificador y SHA-256 fueron almacenados automáticamente. El PDF final quedó guardado únicamente en este equipo.",
+        "ok"
       );
     }
     duplicadosDetectados = [];
@@ -1573,8 +1887,17 @@ async function eliminarSeleccionadosAdmin() {
   btn.disabled = true;
 
   try {
-    for (const id of ids) await deleteDoc(doc(db,"certificaciones",id));
-    estado.textContent = `Se eliminaron ${ids.length} registro(s).`;
+    for (const id of ids) {
+      await deleteDoc(doc(db,"certificaciones",id));
+      try {
+        await deleteObject(storageRef(storage, `certificaciones/${id}.pdf`));
+      } catch (errPdf) {
+        // El PDF puede no existir en Storage (certificaciones anteriores a esta
+        // función, o el respaldo falló en su momento): no se considera un error.
+        console.warn(`No se eliminó el PDF respaldado de ${id}:`, errPdf?.code || errPdf);
+      }
+    }
+    estado.textContent = `Se eliminaron ${ids.length} registro(s), incluyendo su PDF respaldado cuando existía.`;
     await cargarAdministracion();
     await cargarHistorial();
   } catch (err) {
@@ -1784,7 +2107,17 @@ onAuthStateChanged(auth,async user => {
 
     loginScreen.classList.add("oculto");
     appScreen.classList.remove("oculto");
-    mostrarPagina("inicio");
+
+    const idConsultaEnUrl = new URLSearchParams(window.location.search).get("consulta");
+    if (idConsultaEnUrl) {
+      mostrarPagina("verificar");
+      const inputId = $("inputConsultaId");
+      inputId.value = idConsultaEnUrl.trim().toUpperCase();
+      $("btnConsultar").click();
+      window.history.replaceState({}, "", window.location.pathname);
+    } else {
+      mostrarPagina("inicio");
+    }
   } catch(err) {
     console.error(err);
     resetearEstadoSesion();
