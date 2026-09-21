@@ -12,34 +12,96 @@ service cloud.firestore {
       return request.auth != null &&
         (
           request.auth.uid == "wBCSJ3XfHVaUZPLmC2yJddh5RXx1" ||
-          request.auth.uid == "4tdNYgErvlM7NB3hwP933avL3RT2"
+          request.auth.uid == "4tdNYgErvlM7NB3hwP933avL3RT2" ||
+          request.auth.token.email == "jdesposorio@pj.gob.pe" ||
+          request.auth.token.email == "rdavilaaa@pj.gob.pe"
         );
     }
 
+    function esMesaPartes() {
+      return request.auth != null &&
+        request.auth.token.email == "archivocsjsanta@pj.gob.pe";
+    }
+
     match /usuarios/{uid} {
-      allow read: if esAdministrador() || (esCertificador() && request.auth.uid == uid);
+      allow read: if esAdministrador() ||
+        (esCertificador() && request.auth.uid == uid) ||
+        (esMesaPartes() && request.auth.uid == uid);
 
       allow create: if
         (esAdministrador() && request.auth.uid == uid) ||
-        (esCertificador() && request.auth.uid == uid);
+        (esCertificador() && request.auth.uid == uid) ||
+        (esMesaPartes() && request.auth.uid == uid);
 
       allow update: if
         (esAdministrador() && request.auth.uid == uid) ||
-        (esCertificador() && request.auth.uid == uid);
+        (esCertificador() && request.auth.uid == uid) ||
+        (esMesaPartes() && request.auth.uid == uid);
 
       allow delete: if false;
     }
 
-    match /certificaciones/{certificacionId} {
-
-      allow get: if true;
-      allow list: if esAdministrador() || esCertificador();
+    // Bandeja de documentos generados por los certificadores y pendientes de
+    // firma. Desde que se trabaja con una carpeta compartida, el documento
+    // en pendientesFirma solo guarda METADATOS: el certificador guarda el
+    // PDF [SF] directamente en disco (carpeta compartida) y Mesa de Partes
+    // lo ubica y firma desde ahí, ya no se descarga desde la app.
+    match /pendientesFirma/{pendienteId} {
+      allow read: if esAdministrador() || esCertificador() || esMesaPartes();
 
       allow create: if esCertificador()
-        && request.resource.data.certificadorUid == request.auth.uid;
+        && request.resource.data.certificadorUid == request.auth.uid
+        && request.resource.data.estado == "pendiente-firma";
+
+      allow update: if esMesaPartes()
+        && resource.data.estado == "pendiente-firma"
+        && request.resource.data.estado == "pendiente-firma";
+
+      // El certificador puede cancelar (eliminar) su propio documento
+      // mientras siga "pendiente-firma", por ejemplo si envió el archivo
+      // equivocado a Mesa de Partes.
+      allow delete: if esAdministrador() || esMesaPartes()
+        || (esCertificador()
+            && resource.data.certificadorUid == request.auth.uid
+            && resource.data.estado == "pendiente-firma");
+
+      // Ya no se archiva el PDF provisional en Firestore (viaja por la
+      // carpeta compartida), así que no se permiten nuevos chunks aquí.
+      // Se conserva el acceso de lectura/borrado por compatibilidad con
+      // registros antiguos que sí llegaron a archivar chunks.
+      match /pdfChunks/{chunkId} {
+        allow read: if esAdministrador() || esCertificador() || esMesaPartes();
+        allow create: if false;
+        allow update: if false;
+        allow delete: if esAdministrador() || esMesaPartes();
+      }
+    }
+
+    match /certificaciones/{certificacionId} {
+      allow get: if true;
+      allow list: if esAdministrador() || esCertificador() || esMesaPartes();
+
+      // El certificador ya no crea la certificación definitiva.
+      // Mesa de Partes la crea después de verificar el PDF firmado.
+      allow create: if esMesaPartes()
+        && request.resource.data.certificadorUid ==
+          get(/databases/$(database)/documents/pendientesFirma/$(certificacionId)).data.certificadorUid
+        && request.resource.data.firmanteUid == request.auth.uid
+        && request.resource.data.estado == "certificado";
 
       allow update: if false;
       allow delete: if esAdministrador();
+
+      // Desde v15, el PDF final firmado ya NO se archiva en Firestore (viaja
+      // por la carpeta compartida). Se deja de permitir nuevos chunks aquí;
+      // solo se conserva lectura/borrado por compatibilidad con registros
+      // antiguos que sí llegaron a archivar el PDF en chunks.
+      match /pdfChunks/{chunkId} {
+        allow read: if esAdministrador() || esCertificador() || esMesaPartes();
+        allow create: if false;
+        allow update: if false;
+        allow delete: if esAdministrador() || esMesaPartes();
+      }
     }
 
     match /{document=**} {

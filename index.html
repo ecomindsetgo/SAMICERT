@@ -35,7 +35,7 @@
       </div>
     </div>
     <h2>Acceso al sistema</h2>
-    <p>Ingresa con una de las cuentas autorizadas para certificar documentos y consultar las certificaciones registradas.</p>
+    <p>Ingresa con una cuenta autorizada según su función: certificador, Mesa de Partes o administrador.</p>
     <form id="loginForm">
       <div class="field">
         <label for="loginEmail">Correo electrónico</label>
@@ -67,6 +67,7 @@
       <button class="nav-btn active" data-page="inicio"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9"/></svg></span>Inicio</button>
       <button class="nav-btn" data-page="certificar"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="m9.5 14.5 2 2 4-4.5"/></svg></span>Certificar Documento</button>
       <button class="nav-btn" data-page="verificar"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.2c0 4.6 3 7.9 7 9.3 4-1.4 7-4.7 7-9.3V6l-7-2.5Z"/><path d="m9 12 2 2 4-4.5"/></svg></span>Verificar Documento</button>
+      <button class="nav-btn oculto" id="navFirmar" data-page="firmar"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="m7 16 9-9 3 3-9 9H7v-3Z"/><path d="M14 7 16 5l3 3-2 2"/></svg></span>Firmar y remitir</button>
       <button class="nav-btn" data-page="historial"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9a8.5 8.5 0 1 1 1 8.4"/><path d="M3.5 4.5v4.5H8"/><path d="M12 8.5v4l3 2"/></svg></span>Historial de Certificaciones</button>
       <button class="nav-btn" data-page="acerca"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M12 11v5.3"/><circle cx="12" cy="8" r=".9" fill="currentColor" stroke="none"/></svg></span>Acerca de SAMICERT</button>
       <button class="nav-btn" data-page="seguridad"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6"/><path d="M8.5 10.5V7a3.5 3.5 0 0 1 7 0v3.5"/><circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg></span>Seguridad / Contraseña</button>
@@ -74,7 +75,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      SAMICERT v2.1.0<br>
+      SAMICERT v2.2.0<br>
       Creado por Alfredo Raúl Cruzado Palacios<br>
       © 2026 Poder Judicial del Perú
     </div>
@@ -112,16 +113,16 @@
         </div>
 
         <div class="cards">
-          <div class="home-card card-green">
+          <div class="home-card card-green" id="cardInicioCertificar">
             <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="m9.5 14.5 2 2 4-4.5"/></svg></div>
             <div>
               <h3>Certificar Documento</h3>
-              <p>Seleccione un PDF, elija las páginas y aplique el sello de certificación. El sistema genera automáticamente el identificador y registra la huella SHA-256.</p>
+              <p>Seleccione un PDF, elija las páginas y genere el documento provisional [SF]. SAMICERT lo entrega a Mesa de Partes para la firma digital y el registro definitivo.</p>
               <button class="btn-card" data-go="certificar">Ir a Certificar</button>
             </div>
           </div>
 
-          <div class="home-card card-blue">
+          <div class="home-card card-blue" id="cardInicioVerificar">
             <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.2c0 4.6 3 7.9 7 9.3 4-1.4 7-4.7 7-9.3V6l-7-2.5Z"/><path d="m9 12 2 2 4-4.5"/></svg></div>
             <div>
               <h3>Verificar Documento</h3>
@@ -130,7 +131,16 @@
             </div>
           </div>
 
-          <div class="home-card card-purple">
+          <div class="home-card card-teal oculto" id="cardInicioFirmar">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="m7 16 9-9 3 3-9 9H7v-3Z"/><path d="M14 7 16 5l3 3-2 2"/></svg></div>
+            <div>
+              <h3>Firmar y remitir</h3>
+              <p>Ubique en la carpeta compartida el PDF provisional [SF] generado por el certificador, fírmelo con Firma ONPE y cargue el PDF firmado para culminar la certificación.</p>
+              <button class="btn-card" data-go="firmar">Ir a Firmar</button>
+            </div>
+          </div>
+
+          <div class="home-card card-purple" id="cardInicioHistorial">
             <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9a8.5 8.5 0 1 1 1 8.4"/><path d="M3.5 4.5v4.5H8"/><path d="M12 8.5v4l3 2"/></svg></div>
             <div>
               <h3>Historial de Certificaciones</h3>
@@ -139,7 +149,7 @@
             </div>
           </div>
 
-          <div class="home-card card-orange">
+          <div class="home-card card-orange" id="cardInicioAcerca">
             <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M12 11v5.3"/><circle cx="12" cy="8" r=".9" fill="currentColor" stroke="none"/></svg></div>
             <div>
               <h3>Acerca de SAMICERT</h3>
@@ -158,7 +168,18 @@
       <section class="page" id="page-certificar">
         <div class="section-head">
           <h2>Certificar Documento</h2>
-          <p>Seleccione el PDF y las páginas que serán certificadas.</p>
+          <p>Seleccione el PDF y las páginas que serán certificadas. La certificación se registra recién después de importar el PDF firmado digitalmente.</p>
+        </div>
+
+        <div class="panel" id="panelMisPendientes">
+          <div class="panel-title">Mis documentos enviados a Mesa de Partes (pendientes de firma)</div>
+          <div class="panel-subtitle">
+            Si envió un documento por error, puede cancelarlo aquí mientras siga "pendiente de firma".
+            Una vez que Mesa de Partes lo firma y registra, ya no aparece en esta lista.
+          </div>
+          <div id="misPendientesLista" class="firma-pendientes-lista">
+            <div class="empty">Cargando…</div>
+          </div>
         </div>
 
         <div class="panel">
@@ -214,8 +235,19 @@
           </div>
 
           <div class="actions">
-            <button class="btn-green" id="btnAplicar" disabled>Aplicar sello y guardar</button>
+            <button class="btn-green" id="btnAplicar" disabled>Generar documento para firma</button>
             <button class="btn-gray oculto" id="btnLimpiar">Quitar documento</button>
+          </div>
+
+          <div id="panelFirma" class="firma-panel oculto">
+            <div class="panel-title">Documento entregado a Mesa de Partes</div>
+            <div class="panel-subtitle">
+              El PDF provisional fue almacenado en SAMICERT y quedó disponible en la bandeja de <strong>Mesa de Partes</strong>.
+              La firma digital, el SHA-256 definitivo y el registro final se realizan desde la cuenta de Mesa de Partes.
+            </div>
+            <div class="firma-pasos">
+              <span>1. Certificador genera [SF]</span><span>→</span><span>2. Mesa de Partes firma</span><span>→</span><span>3. SAMICERT calcula SHA-256 y registra</span>
+            </div>
           </div>
 
           <div id="hashResultado" class="hash-resultado oculto"></div>
@@ -223,6 +255,56 @@
       </section>
 
       
+      <section class="page" id="page-firmar">
+        <div class="section-head">
+          <h2>Firmar y remitir documentos</h2>
+          <p>Módulo exclusivo de Mesa de Partes. Los certificadores guardan los PDF provisionales [SF] directamente en la carpeta compartida; aquí se firman con Firma ONPE y se culmina la certificación.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Bandeja de documentos pendientes de firma</div>
+          <div class="panel-subtitle">
+            Ubique el PDF [SF] en la carpeta compartida (el nombre exacto se muestra en cada documento), fírmelo digitalmente con Firma ONPE y luego haga clic en "Firmar y registrar" para cargar el PDF ya firmado.
+            El SHA-256 definitivo se calcula sobre el PDF ya firmado.
+          </div>
+          <div id="pendientesFirmaLista" class="firma-pendientes-lista">
+            <div class="empty">Cargando documentos pendientes…</div>
+          </div>
+          <div class="admin-status" id="pendientesFirmaEstado"></div>
+        </div>
+
+        <div id="panelFirmaMesa" class="panel firma-panel oculto">
+          <div class="panel-title" id="firmaPendienteTitulo">Firma digital</div>
+          <div id="firmaPendienteDetalle" class="panel-subtitle"></div>
+
+          <div class="firma-pasos">
+            <span>1. Ubicar [SF] en carpeta compartida</span><span>→</span><span>2. Firmar con Firma ONPE</span><span>→</span><span>3. Cargar PDF firmado</span><span>→</span><span>4. Calcular SHA-256 y registrar</span>
+          </div>
+
+          <div class="verify-upload firma-upload">
+            <input type="file" id="inputPdfFirmado" accept="application/pdf,.pdf">
+            <div id="archivoPdfFirmadoNombre" class="verify-file-name oculto"></div>
+          </div>
+
+          <div class="actions firma-actions">
+            <button type="button" class="btn-green" id="btnRegistrarFirmado" disabled>Firmar, calcular SHA y registrar</button>
+            <button type="button" class="btn-gray" id="btnCancelarFirmaMesa">Cancelar</button>
+          </div>
+        </div>
+
+        <div id="hashResultadoMesa" class="hash-resultado oculto"></div>
+
+        <div class="panel" id="panelMisFirmados">
+          <div class="panel-title">Documentos firmados recientemente</div>
+          <div class="panel-subtitle">
+            Certificaciones que usted ya firmó y registró. Para el listado completo de todas las certificaciones, use "Historial de Certificaciones".
+          </div>
+          <div id="misFirmadosLista" class="firma-pendientes-lista">
+            <div class="empty">Cargando…</div>
+          </div>
+        </div>
+      </section>
+
       <section class="page" id="page-verificar">
         <div class="section-head">
           <h2>Verificar Documento</h2>
@@ -268,7 +350,7 @@
       <section class="page" id="page-historial">
         <div class="section-head">
           <h2>Historial de Certificaciones</h2>
-          <p>Registro centralizado de las certificaciones realizadas por los dos usuarios autorizados.</p>
+          <p>Registro centralizado de las certificaciones culminadas, con trazabilidad del certificador y de Mesa de Partes.</p>
         </div>
 
         <div class="panel">
@@ -335,7 +417,7 @@
             no los archivos PDF.
           </div>
           <div class="admin-toolbar">
-            <button class="btn-green btn-icon" id="btnCrearBackup"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg> Generar respaldo</button>
+            <button class="btn-green btn-icon" id="btnCrearBackup"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0 4-4m-4 4-4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg> Generar respaldo</button>
             <span class="admin-status" id="backupStatus"></span>
           </div>
         </div>

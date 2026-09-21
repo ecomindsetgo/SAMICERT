@@ -148,7 +148,7 @@ $("inputPdf").addEventListener("change", async e => {
   }
 });
 
-
+// Enlace / QR de la constancia: ?consulta=CERT-AAAA-XXXXXXXXXXXX (también acepta ?id=)
 const params = new URLSearchParams(window.location.search);
 const idInicial = params.get("consulta") || params.get("id");
 if (idInicial) consultar(idInicial);
