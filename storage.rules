@@ -16,7 +16,7 @@ service firebase.storage {
         );
     }
 
-    // PDF finales certificados, respaldados como certificaciones/{ID}.pdf
+    
     match /certificaciones/{archivo} {
       allow read: if esAdministrador() || esCertificador();
       allow create: if esCertificador();
