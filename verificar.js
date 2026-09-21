@@ -26,9 +26,9 @@ function ocultarResultados() {
   registroActual = null;
 }
 
-function foliosComoTexto(pags, total) {
+function rangosFolios(pags) {
   const orden = [...(pags || [])].sort((a, b) => a - b);
-  if (!orden.length) return "—";
+  if (!orden.length) return "";
   // Agrupa en rangos: 1, 2, 3, 7 → "1-3, 7"
   const tramos = [];
   let ini = orden[0], prev = orden[0];
@@ -38,7 +38,7 @@ function foliosComoTexto(pags, total) {
     tramos.push(ini === prev ? `${ini}` : `${ini}-${prev}`);
     ini = prev = n;
   }
-  return `${orden.length} de ${total ?? "?"} folios (págs. ${tramos.join(", ")} del documento original)`;
+  return tramos.join(", ");
 }
 
 function mostrarRegistro(r) {
@@ -46,7 +46,14 @@ function mostrarRegistro(r) {
   $("dId").textContent = r.id || "";
   $("dFecha").textContent = `${r.fecha || ""} ${r.hora || ""}`.trim() + (r.zonaHoraria ? " (hora de Lima)" : "");
   $("dCertificador").textContent = r.certificadorNombre || "Usuario autorizado";
-  $("dFolios").textContent = foliosComoTexto(r.paginasCertificadas, r.totalPaginas);
+
+  const cantCertificadas = (r.paginasCertificadas || []).length;
+  const rangos = rangosFolios(r.paginasCertificadas);
+  $("dTotalFolios").textContent = String(r.totalPaginas ?? "—");
+  $("dFoliosCertificados").textContent = rangos
+    ? `${cantCertificadas} (págs. ${rangos} del documento original)`
+    : String(cantCertificadas);
+
   $("dEstado").textContent = r.estado === "certificado" || !r.estado ? "Certificación vigente en el registro" : String(r.estado);
 
   const av = $("avisoRecert");
