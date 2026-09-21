@@ -6,7 +6,7 @@
 <title>SAMICERT — Sistema de Archivo y Manejo de Información para la Certificación de Documentos</title>
 
 <script>
-  // Los enlaces/QR de consulta ya emitidos apuntaban a "/?consulta=ID": se envían a la página pública.
+  
   (function () {
     var c = new URLSearchParams(window.location.search).get("consulta");
     if (c) window.location.replace("verificar.html?consulta=" + encodeURIComponent(c));
