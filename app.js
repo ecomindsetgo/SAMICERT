@@ -16,7 +16,6 @@ const auth = getAuth(appFirebase);
 const db = getFirestore(appFirebase);
 const storage = getStorage(appFirebase);
 
-// ── Íconos SVG en línea (look profesional, reemplazan a los emojis/glifos) ──
 const ICONOS = {
   lupa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.35-4.35"/></svg>',
   rotar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 3v5h-5"/></svg>',
@@ -49,9 +48,6 @@ const btnGuardarPassword = $("btnGuardarPassword");
 const btnLimpiarPassword = $("btnLimpiarPassword");
 const passwordMessage = $("passwordMessage");
 
-// Si se llegó desde un enlace/QR de consulta (?consulta=ID), se avisa en la
-// pantalla de acceso; tras iniciar sesión, onAuthStateChanged reabre esa
-// consulta automáticamente en la sección "Verificar Documento".
 const idConsultaInicial = new URLSearchParams(window.location.search).get("consulta");
 if (idConsultaInicial) {
   const parrafoLogin = document.querySelector(".login-card p");
@@ -167,7 +163,6 @@ async function buscarCertificacionesPrevias(hashOrigen, nombreArchivo) {
     throw err;
   }
 
-  // Más recientes primero
   return Array.from(encontrados.values()).sort((a, b) => {
     const fa = `${a.registro.fecha || ""} ${a.registro.hora || ""}`;
     const fb = `${b.registro.fecha || ""} ${b.registro.hora || ""}`;
@@ -244,8 +239,6 @@ function mostrarAlertaDuplicado(coincidencias) {
   box.classList.remove("oculto");
 }
 
-/* Modal de confirmación: obliga a dejar constancia escrita del motivo antes
-   de permitir una segunda certificación sobre el mismo documento. */
 function confirmarRecertificacion(coincidencias, solapadas) {
   return new Promise(resolve => {
     const modal   = $("modalRecert");
@@ -761,8 +754,6 @@ async function seleccionarPdf(file) {
   renderLista();
   cargarVisorPaginas(file);
 
-  // Revisión de duplicados apenas se carga el archivo: el certificador se
-  // entera ANTES de invertir tiempo seleccionando páginas.
   const box = $("alertaDuplicado");
   if (box) {
     box.className = "alerta-duplicado alerta-info";
@@ -774,7 +765,6 @@ async function seleccionarPdf(file) {
     const bytesOrigen = await file.arrayBuffer();
     hashOrigenActual = await calcularSHA256(bytesOrigen);
 
-    // Si el usuario cambió de archivo mientras se calculaba, se descarta.
     if (!archivoSeleccionado || archivoSeleccionado.file !== file) return;
 
     duplicadosDetectados = await buscarCertificacionesPrevias(hashOrigenActual, file.name);
@@ -900,10 +890,6 @@ function pivoteParaRotar(centro, tamano, giroDeg) {
   return { x: centro.x - rx, y: centro.y - ry };
 }
 
-// Calcula dónde va a caer el sello (esquina/pivote/giro) SIN dibujar nada todavía.
-// Esto permite dibujar primero los textos (fecha/hora/código/folio) y recién
-// después la imagen del sello encima, para que el texto quede detrás de la
-// firma/imagen y no compitiendo visualmente con ella.
 function calcularPosicionSello(pagina, esquina, tamano, margen, rotacionFinal) {
   const centro = centroSelloEnCoordenadasPdf(
     pagina, esquina, tamano, margen, rotacionFinal
@@ -920,8 +906,6 @@ function calcularPosicionSello(pagina, esquina, tamano, margen, rotacionFinal) {
   };
 }
 
-// Dibuja la imagen del sello en la posición ya calculada. Se llama DESPUÉS de
-// dibujar los textos, así la imagen queda por delante (encima) de ellos.
 function dibujarImagenSello(pagina, imagen, posicion, tamano) {
   pagina.drawImage(imagen, {
     x: posicion.x,
@@ -932,9 +916,6 @@ function dibujarImagenSello(pagina, imagen, posicion, tamano) {
   });
 }
 
-// ── Utilidades para el código QR de la carátula (sin dependencias del DOM además del canvas) ──
-// Carga el emblema que va al centro del QR (logo-qr.png). Si no está o no se puede leer,
-// el QR se genera igual, sin emblema.
 async function cargarLogoParaQR() {
   try {
     const resp = await fetch("./logo-qr.png", { cache: "no-cache" });
@@ -1139,7 +1120,6 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
   }
   y -= 6;
 
-  // El enlace es largo: se reduce el tamaño de letra solo si no cabe en la hoja
   let tamUrl = 10.5;
   const anchoUrl = fTitulo.widthOfTextAtSize(resumen.consultaUrl, tamUrl);
   if (anchoUrl > width - 80) tamUrl = tamUrl * (width - 80) / anchoUrl;
@@ -1235,7 +1215,6 @@ async function aplicarSelloAUnPdf(file) {
 
     if (!paginasSeleccionadas.has(n)) return;
 
-    // 1) Se calcula dónde va a caer el sello, pero todavía no se dibuja la imagen.
     const posSello = calcularPosicionSello(
       pagina, esquina, tamano, margen, rotacionFinal
     );
@@ -1265,8 +1244,7 @@ async function aplicarSelloAUnPdf(file) {
     const cosGiro = Math.cos(radGiro);
     const sinGiro = Math.sin(radGiro);
 
-    // 2) Se dibujan primero los textos (fecha, hora, código y folio): quedan
-    //    "detrás" porque la imagen del sello se dibuja recién después, encima.
+    
     textos.forEach(([texto, size], i) => {
       const ancho = fuente.widthOfTextAtSize(texto, size);
       const localX = tamano / 2 - ancho / 2;
@@ -1284,9 +1262,7 @@ async function aplicarSelloAUnPdf(file) {
       });
     });
 
-    // 3) Recién ahora se dibuja la imagen del sello, por encima del texto.
-    //    En las zonas transparentes del PNG (fuera de la firma/tinta) el
-    //    texto sigue siendo visible; donde el sello es opaco, lo tapa.
+    
     dibujarImagenSello(pagina, sellImage, posSello, tamano);
   });
 
@@ -1325,9 +1301,7 @@ function nombreConSufijo(nombre) {
 async function guardarResultado(bytesSalida,nombre,handleDestino) {
   const blob = new Blob([bytesSalida],{type:"application/pdf"});
 
-  // Si ya se obtuvo un "handle" de showSaveFilePicker al inicio del clic
-  // (antes de las operaciones asíncronas de certificación), se usa aquí
-  // para escribir el archivo en la ubicación que el operador eligió.
+  
   if (handleDestino) {
     const writable = await handleDestino.createWritable();
     await writable.write(blob);
@@ -1335,8 +1309,7 @@ async function guardarResultado(bytesSalida,nombre,handleDestino) {
     return true;
   }
 
-  // Respaldo para navegadores sin File System Access API (Firefox, Safari):
-  // descarga clásica a la carpeta de descargas del navegador.
+  
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1355,14 +1328,7 @@ btnAplicar.addEventListener("click",async () => {
 
   const nombreDestino = nombreConSufijo(archivoSeleccionado.name);
 
-  // ── Elegir ubicación de guardado ANTES de cualquier operación asíncrona ──
-  // showSaveFilePicker solo funciona mientras el navegador todavía reconoce
-  // el clic como un "user gesture" activo. Si se llama después de esperar
-  // el hash, la consulta a Firestore o el sellado del PDF, el navegador ya
-  // no lo considera parte del gesto y lo bloquea con:
-  // "Must be handling a user gesture to show a file picker."
-  // Por eso se pide aquí, de entrada, y se guarda el handle para escribir
-  // el archivo recién al final, cuando el PDF certificado esté listo.
+  
   let handleDestino = null;
   if ("showSaveFilePicker" in window) {
     try {
@@ -1388,10 +1354,7 @@ btnAplicar.addEventListener("click",async () => {
     }
   }
 
-  // ── Revalidación en el momento exacto de certificar ──────────────────
-  // No basta con la revisión hecha al cargar el archivo: entre ese momento
-  // y este pudo pasar mucho tiempo, o el otro certificador pudo haber
-  // registrado el mismo documento en paralelo.
+  
   let datosRecert = { continuar: true, motivo: "" };
   try {
     if (!hashOrigenActual) {
@@ -1440,11 +1403,7 @@ btnAplicar.addEventListener("click",async () => {
     const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
     const sha256 = await calcularSHA256(resultado.bytesSalida);
 
-    // ── El PDF final NO se respalda en el sistema (Firebase Storage) ──────
-    // Por decisión operativa, el único ejemplar del PDF certificado queda
-    // en el equipo del certificador. El sistema solo conserva el registro
-    // (metadatos + SHA-256) en Firestore, para poder verificar integridad
-    // sin necesitar el archivo en sí.
+    
     const registro = {
       ...resultado.meta,
       sha256,
