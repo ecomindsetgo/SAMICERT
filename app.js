@@ -771,9 +771,9 @@ $("btnZoomMas").addEventListener("click", () => cambiarZoomModal(0.25));
 $("btnZoomMenos").addEventListener("click", () => cambiarZoomModal(-0.25));
 $("btnZoomAjustar").addEventListener("click", ajustarZoomModal);
 $("btnRotarModal").addEventListener("click", rotarVistaModal);
-$("btnPaginaAnterior").addEventListener("click", () => cambiarPaginaModal(-1));
-$("btnPaginaSiguiente").addEventListener("click", () => cambiarPaginaModal(1));
-$("btnAlternarSeleccionModal").addEventListener("click", alternarSeleccionDesdeModal);
+$("btnPaginaAnterior")?.addEventListener("click", () => cambiarPaginaModal(-1));
+$("btnPaginaSiguiente")?.addEventListener("click", () => cambiarPaginaModal(1));
+$("btnAlternarSeleccionModal")?.addEventListener("click", alternarSeleccionDesdeModal);
 $("btnCerrarVisorModal").addEventListener("click", cerrarVistaAmpliada);
 
 $("visorModal").addEventListener("click", e => {
