@@ -30,12 +30,6 @@ if (window.pdfjsLib) {
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 }
 
-// NOTA v15: SAMICERT ya NO archiva el PDF certificado (ni el provisional ni
-// el final firmado) en Firestore. Ambos PDFs quedan únicamente en la
-// carpeta compartida (guardados en disco por el certificador y por Mesa de
-// Partes respectivamente). Esto evita las subidas en chunks a Firestore,
-// que eran lentas y hacían crecer la base de datos sin necesidad; Firestore
-// solo guarda los metadatos de cada certificación.
 const MESA_PARTES_EMAIL = "archivocsjsanta@pj.gob.pe";
 
 function esUsuarioMesaPartes(user = usuarioActual) {
@@ -157,8 +151,8 @@ async function calcularSHA256(bytes) {
 }
 
 
-let duplicadosDetectados = [];   // certificaciones previas que coinciden
-let hashOrigenActual = null;     // SHA-256 del archivo original cargado
+let duplicadosDetectados = [];   
+let hashOrigenActual = null;     
 
 async function buscarCertificacionesPrevias(hashOrigen, nombreArchivo) {
   const encontrados = new Map(); // id → { registro, porContenido, porNombre }
@@ -202,9 +196,7 @@ async function buscarCertificacionesPrevias(hashOrigen, nombreArchivo) {
   });
 }
 
-/* Determina si las páginas que se van a certificar ahora se solapan con las
-   ya certificadas antes. Certificar folios distintos del mismo expediente es
-   una operación legítima; repetir los mismos folios no lo es. */
+
 function paginasSolapadas(previas, actuales) {
   const set = new Set(previas || []);
   return (actuales || []).filter(p => set.has(p));
@@ -967,8 +959,6 @@ async function cargarLogoParaQR() {
 }
 
 async function generarQRDataUrl(texto, tamanoPx = 320) {
-  // Corrección de errores nivel "H" (~30 %): permite tapar el centro con el emblema
-  // y que el QR siga siendo legible.
   const qr = qrcode(0, "H");
   qr.addData(texto);
   qr.make();
@@ -990,7 +980,7 @@ async function generarQRDataUrl(texto, tamanoPx = 320) {
 
   const logo = await cargarLogoParaQR();
   if (logo) {
-    // El emblema ocupa ~20 % del ancho del QR (≈4 % de su área) sobre un fondo blanco
+    
     const caja = Math.round(size * 0.20);
     const escala = Math.min(caja / logo.width, caja / logo.height);
     const w = Math.round(logo.width * escala), h = Math.round(logo.height * escala);
@@ -1030,13 +1020,12 @@ function envolverTexto(texto, fuente, size, maxAncho) {
 
 async function obtenerLogoInstitucional(pdfDoc) {
   try {
-    // cache: "no-cache" evita usar una versión antigua del logo guardada por el navegador
+    
     const resp = await fetch("./logo-institucional.png", { cache: "no-cache" });
     if (!resp.ok) throw new Error("sin logo institucional publicado");
     const bytes = new Uint8Array(await resp.arrayBuffer());
 
-    // Se detecta el formato real por los primeros bytes del archivo y no por su extensión:
-    // un JPEG guardado con nombre ".png" hacía fallar embedPng y se caía al marcador "PJ".
+    /
     const esPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
     const esJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
     if (esPng) return await pdfDoc.embedPng(bytes);
@@ -1048,7 +1037,7 @@ async function obtenerLogoInstitucional(pdfDoc) {
   }
 }
 
-// ── Carátula inicial del PDF final, según el diseño institucional ──────────
+
 async function crearPaginaCaratula(pdfDoc, resumen) {
   const { rgb, StandardFonts } = PDFLib;
   const fTitulo = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -1066,8 +1055,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
 
   const logo = await obtenerLogoInstitucional(pdfDoc);
   if (logo) {
-    // El logo institucional ya incluye la leyenda "Poder Judicial del Perú",
-    // por lo que no se repite el nombre de la institución debajo.
+    
     const logoAncho = 150, logoAlto = 112;
     const escala = Math.min(logoAncho / logo.width, logoAlto / logo.height);
     const wLogo = logo.width * escala, hLogo = logo.height * escala;
@@ -1080,7 +1068,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
     });
     y -= 34;
   } else {
-    // Sin logo publicado (o ilegible): marcador "PJ" + nombre de la institución
+    
     const logoAncho = 96, logoAlto = 64;
     pagina.drawRectangle({
       x: width / 2 - logoAncho / 2, y: y - logoAlto, width: logoAncho, height: logoAlto,
@@ -1136,8 +1124,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
 
   const notaEmision = "(DOCUMENTOS EMITIDOS POR LA ENTIDAD)";
   pagina.drawText(notaEmision, {
-    x: width / 2 - fTitulo.widthOfTextAtSize(notaEmision, 9) / 2,
-    y, size: 9, font: fTitulo, color: azul
+    x: margenX, y, size: 7.5, font: fTexto, color: gris
   });
   y -= 18;
 
