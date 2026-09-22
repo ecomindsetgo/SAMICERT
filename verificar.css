@@ -71,3 +71,96 @@ label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:7
   .fila{flex-direction:column}
   .btn{padding:13px}
 }
+
+
+/* =========================================================
+   SAMICERT VERIFICACIÓN — RESPONSIVE / MÓVILES
+   Solo presentación. No modifica verificar.js.
+   ========================================================= */
+
+@media (max-width: 700px) {
+  html { -webkit-text-size-adjust:100%; }
+  body { overflow-x:hidden; }
+
+  .topbar-in {
+    padding:13px 12px;
+    gap:11px;
+    align-items:center;
+  }
+  .topbar-logo {
+    height:52px;
+    max-width:105px;
+    padding:4px 7px;
+    border-radius:7px;
+  }
+  .topbar-sam { font-size:22px; }
+  .topbar-sub { font-size:11px; margin-top:4px; }
+  .topbar-inst { font-size:9.5px; line-height:1.3; }
+
+  .wrap {
+    width:100%;
+    padding:12px 10px 26px;
+    gap:11px;
+  }
+  .card {
+    padding:16px 13px;
+    border-radius:11px;
+  }
+  h1 { font-size:18px; line-height:1.25; }
+  h2 { font-size:17px; }
+  .lead, .sub { font-size:12.5px; line-height:1.5; }
+
+  .fila {
+    flex-direction:column;
+    gap:8px;
+  }
+  .fila input {
+    width:100%;
+    min-height:44px;
+    font-size:14px;
+  }
+  .btn {
+    width:100%;
+    min-height:44px;
+    padding:10px 14px;
+  }
+
+  .resultado p { font-size:12.5px; }
+  .sello { width:52px; height:52px; font-size:28px; }
+
+  .datos {
+    display:block;
+    border-top:1px solid var(--line);
+  }
+  .datos dt {
+    padding:9px 0 2px;
+    border-bottom:0;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.2px;
+    color:#64748b;
+  }
+  .datos dd {
+    padding:2px 0 10px;
+    font-size:13px;
+    word-break:break-word;
+  }
+
+  .aviso { font-size:12px; padding:11px 12px; }
+}
+
+@media (max-width: 420px) {
+  .topbar-in { align-items:flex-start; }
+  .topbar-logo { height:45px; max-width:88px; }
+  .topbar-sam { font-size:20px; }
+  .topbar-sub { font-size:10px; }
+  .topbar-inst { font-size:9px; }
+
+  .wrap { padding-left:8px; padding-right:8px; }
+  .card { padding:14px 12px; }
+  h1 { font-size:17px; }
+  .lead { font-size:12px; }
+
+  .fila input { font-size:13px; }
+  .datos dd { font-size:12.5px; }
+}
