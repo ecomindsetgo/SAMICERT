@@ -98,6 +98,9 @@ let perfilActual = null;
 let selloBytes = null;
 let procesoFirmaPendiente = null;
 let pdfFirmadoSeleccionado = null;
+let temporizadorHashResultado = null;
+let temporizadorHashResultadoMesa = null;
+const TIEMPO_MENSAJE_EXITO_MS = 12000;
 
 // El sello físico mide 5x5 cm. En pruebas de impresión, 90pt se imprimió
 // como 2.9x2.9 cm (la escala real de impresión depende del PDF/impresora,
@@ -327,7 +330,31 @@ function confirmarRecertificacion(coincidencias, solapadas) {
 }
 
 function ocultarHash() {
-  $("hashResultado").classList.add("oculto");
+  if (temporizadorHashResultado) {
+    clearTimeout(temporizadorHashResultado);
+    temporizadorHashResultado = null;
+  }
+  if (temporizadorHashResultadoMesa) {
+    clearTimeout(temporizadorHashResultadoMesa);
+    temporizadorHashResultadoMesa = null;
+  }
+  $("hashResultado")?.classList.add("oculto");
+  $("hashResultadoMesa")?.classList.add("oculto");
+}
+
+function mostrarMensajeExitoTemporal(mensaje) {
+  const box = $("hashResultado");
+  if (!box) return;
+  if (temporizadorHashResultado) clearTimeout(temporizadorHashResultado);
+  box.classList.remove("oculto");
+  box.style.borderLeftColor = "#16823a";
+  box.style.background = "#f6fbf8";
+  box.innerHTML = `<div class="hash-titulo" style="color:#16823a">${escapeHtml(mensaje)}</div>`;
+  temporizadorHashResultado = setTimeout(() => {
+    box.classList.add("oculto");
+    box.innerHTML = "";
+    temporizadorHashResultado = null;
+  }, TIEMPO_MENSAJE_EXITO_MS);
 }
 
 function mostrarEstado(mensaje, tipo="ok") {
@@ -612,6 +639,8 @@ async function abrirVistaAmpliada(numero) {
     await renderPaginaModal(pagina);
     $("visorModalTitulo").textContent = `Página ${numero} — vista ampliada`;
     $("visorModal").classList.remove("oculto");
+    actualizarControlesNavegacionModal();
+    actualizarBotonSeleccionModal();
     document.body.style.overflow = "hidden";
   } catch (error) {
     console.error(error);
@@ -645,6 +674,42 @@ function actualizarIndicadorRotacion(numero) {
   const giro = Number(rotacionesPagina.get(numero) || 0);
   const titulo = $("visorModalTitulo");
   if (titulo) titulo.textContent = `Página ${numero} — vista ampliada${giro ? ` — giro adicional: ${giro}°` : ""}`;
+  actualizarControlesNavegacionModal();
+  actualizarBotonSeleccionModal();
+}
+
+function actualizarControlesNavegacionModal() {
+  const anterior = $("btnPaginaAnterior");
+  const siguiente = $("btnPaginaSiguiente");
+  if (!anterior || !siguiente || !visorModalPaginaActual) return;
+  anterior.disabled = visorModalPaginaActual <= 1;
+  siguiente.disabled = visorModalPaginaActual >= totalPaginas;
+}
+
+function actualizarBotonSeleccionModal() {
+  const boton = $("btnAlternarSeleccionModal");
+  if (!boton || !visorModalPaginaActual) return;
+  const seleccionada = paginasSeleccionadas.has(visorModalPaginaActual);
+  boton.textContent = seleccionada ? "✓ Certificar" : "○ No certificar";
+  boton.classList.toggle("activo", seleccionada);
+}
+
+async function cambiarPaginaModal(delta) {
+  if (!pdfVista || !visorModalPaginaActual) return;
+  const nueva = visorModalPaginaActual + delta;
+  if (nueva < 1 || nueva > totalPaginas) return;
+  await abrirVistaAmpliada(nueva);
+}
+
+function alternarSeleccionDesdeModal() {
+  if (!visorModalPaginaActual) return;
+  const numero = visorModalPaginaActual;
+  const card = visorPaginas().querySelector(`.pagina-card[data-page="${numero}"]`);
+  const check = card?.querySelector(".pagina-check");
+  if (!check) return;
+  check.checked = !check.checked;
+  check.dispatchEvent(new Event("change", {bubbles:true}));
+  actualizarBotonSeleccionModal();
 }
 
 async function rotarPaginaParaSalida(numero) {
@@ -706,6 +771,9 @@ $("btnZoomMas").addEventListener("click", () => cambiarZoomModal(0.25));
 $("btnZoomMenos").addEventListener("click", () => cambiarZoomModal(-0.25));
 $("btnZoomAjustar").addEventListener("click", ajustarZoomModal);
 $("btnRotarModal").addEventListener("click", rotarVistaModal);
+$("btnPaginaAnterior").addEventListener("click", () => cambiarPaginaModal(-1));
+$("btnPaginaSiguiente").addEventListener("click", () => cambiarPaginaModal(1));
+$("btnAlternarSeleccionModal").addEventListener("click", alternarSeleccionDesdeModal);
 $("btnCerrarVisorModal").addEventListener("click", cerrarVistaAmpliada);
 
 $("visorModal").addEventListener("click", e => {
@@ -717,6 +785,8 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") cerrarVistaAmpliada();
   if (e.key === "+" || e.key === "=") cambiarZoomModal(0.25);
   if (e.key === "-") cambiarZoomModal(-0.25);
+  if (e.key === "ArrowLeft") cambiarPaginaModal(-1);
+  if (e.key === "ArrowRight") cambiarPaginaModal(1);
 });
 
 function resetearEstadoSesion() {
@@ -819,7 +889,14 @@ async function seleccionarPdf(file) {
   }
 }
 
-function limpiarArchivo() {
+function limpiarArchivo(opciones) {
+  // Se usa tanto para el botón "Quitar documento" (opciones = evento de click,
+  // por eso se ignora si no trae la forma esperada) como, con
+  // { mantenerMensaje: true }, justo después de generar el documento para
+  // firma: en ese caso NO se debe llamar a ocultarHash(), porque borraría de
+  // inmediato el mensaje de éxito recién mostrado.
+  const mantenerMensaje = !!(opciones && opciones.mantenerMensaje);
+
   if (resultadoBlob) URL.revokeObjectURL(resultadoBlob);
   archivoSeleccionado = null;
   resultadoBlob = null;
@@ -834,7 +911,7 @@ function limpiarArchivo() {
   $("selectorPaginas").classList.add("oculto");
   $("visorPaginas").innerHTML = "";
   $("resumenPaginas").textContent = "Selecciona las páginas que deseas sellar.";
-  ocultarHash();
+  if (!mantenerMensaje) ocultarHash();
   renderLista();
 }
 
@@ -972,40 +1049,70 @@ async function cargarLogoParaQR() {
   }
 }
 
-async function generarQRDataUrl(texto, tamanoPx = 320) {
-  // Corrección de errores nivel "H" (~30 %): permite tapar el centro con el emblema
-  // y que el QR siga siendo legible.
+async function generarQRDataUrl(texto, tamanoPx = 1200) {
+  // QR de alta resolución, con zona de silencio de 4 módulos y corrección H.
+  // La zona de silencio mejora la apariencia y también ayuda a los lectores QR.
   const qr = qrcode(0, "H");
   qr.addData(texto);
   qr.make();
   const count = qr.getModuleCount();
-  const cell = Math.max(1, Math.floor(tamanoPx / count));
-  const size = cell * count;
+  const quietModules = 4;
+  const cell = Math.max(1, Math.floor(tamanoPx / (count + quietModules * 2)));
+  const qrSize = cell * count;
+  const quiet = cell * quietModules;
+  const size = qrSize + quiet * 2;
+
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+
+  // Fondo blanco limpio y módulos negros de alto contraste.
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = "#0b1b2b";
+  ctx.fillStyle = "#111111";
   for (let r = 0; r < count; r++) {
     for (let c = 0; c < count; c++) {
-      if (qr.isDark(r, c)) ctx.fillRect(c * cell, r * cell, cell, cell);
+      if (qr.isDark(r, c)) {
+        ctx.fillRect(quiet + c * cell, quiet + r * cell, cell, cell);
+      }
     }
   }
 
   const logo = await cargarLogoParaQR();
   if (logo) {
-    // El emblema ocupa ~20 % del ancho del QR (≈4 % de su área) sobre un fondo blanco
-    const caja = Math.round(size * 0.20);
+    // Versión refinada: el logo ocupa menos área para que el QR conserve
+    // muchos módulos visibles y el centro se perciba como parte del diseño.
+    // La corrección H se mantiene como respaldo frente al área cubierta.
+    const caja = Math.round(qrSize * 0.22);
     const escala = Math.min(caja / logo.width, caja / logo.height);
-    const w = Math.round(logo.width * escala), h = Math.round(logo.height * escala);
-    const margen = Math.max(3, Math.round(size * 0.015));
-    const cx = size / 2, cy = size / 2;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(Math.round(cx - w / 2 - margen), Math.round(cy - h / 2 - margen), w + margen * 2, h + margen * 2);
+    const w = Math.round(logo.width * escala);
+    const h = Math.round(logo.height * escala);
+    const cx = quiet + qrSize / 2;
+    const cy = quiet + qrSize / 2;
+
+    // Medallón cuadrado con esquinas ligeramente redondeadas.
+const margen = Math.max(3, Math.round(cell * 0.6));
+const lado = Math.max(w, h) + margen * 2;
+const radioEsquina = Math.round(lado * 0.15); // 0.15 = "ligeramente" redondeado
+
+ctx.save();
+ctx.beginPath();
+ctx.roundRect(cx - lado / 2, cy - lado / 2, lado, lado, radioEsquina);
+ctx.fillStyle = "#ffffff";
+ctx.fill();
+ctx.restore();
+
+    // El logo se dibuja suavizado, pero los módulos del QR permanecen
+    // perfectamente definidos para conservar una lectura fiable.
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.drawImage(logo, Math.round(cx - w / 2), Math.round(cy - h / 2), w, h);
+    ctx.restore();
   }
+
   return canvas.toDataURL("image/png");
 }
 
@@ -1173,9 +1280,9 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
   y -= 28;
 
   try {
-    const qrBytes = dataUrlABytes(await generarQRDataUrl(resumen.consultaUrl, 480));
+    const qrBytes = dataUrlABytes(await generarQRDataUrl(resumen.consultaUrl, 1000));
     const qrImg = await pdfDoc.embedPng(qrBytes);
-    const qrTam = 130;
+    const qrTam = 160;
     pagina.drawImage(qrImg, { x: width / 2 - qrTam / 2, y: y - qrTam, width: qrTam, height: qrTam });
     y -= qrTam + 14;
   } catch (e) {
@@ -1455,9 +1562,26 @@ function mostrarResultadoGuardado(resultado, nombre, idFinal, firebaseOk, fireba
       ${resultado.verificado ? "✓ Se verificó el tamaño y la huella del archivo después de guardarlo." : ""}
     </div>
     ${estadoFirebase}`;
+
+  if (esUsuarioMesaPartes()) {
+    if (temporizadorHashResultadoMesa) clearTimeout(temporizadorHashResultadoMesa);
+    temporizadorHashResultadoMesa = setTimeout(() => {
+      box.classList.add("oculto");
+      box.innerHTML = "";
+      temporizadorHashResultadoMesa = null;
+    }, TIEMPO_MENSAJE_EXITO_MS);
+  } else {
+    if (temporizadorHashResultado) clearTimeout(temporizadorHashResultado);
+    temporizadorHashResultado = setTimeout(() => {
+      box.classList.add("oculto");
+      box.innerHTML = "";
+      temporizadorHashResultado = null;
+    }, TIEMPO_MENSAJE_EXITO_MS);
+  }
 }
 
 btnAplicar.addEventListener("click", async () => {
+  ocultarHash();
   if (!archivoSeleccionado || !usuarioActual || esUsuarioMesaPartes()) return;
 
   btnAplicar.disabled = true;
@@ -1558,10 +1682,12 @@ btnAplicar.addEventListener("click", async () => {
     renderLista();
 
     if (panelFirma) panelFirma.classList.add("oculto");
-    mostrarEstado(
-      `✓ Documento ${pendienteId} guardado en la carpeta compartida (${resultadoGuardado.nombre}) y enviado a Mesa de Partes para firma digital. El certificador no registra la certificación definitiva.`,
-      "ok"
+    mostrarMensajeExitoTemporal(
+      `✓ Documento ${pendienteId} guardado en la carpeta compartida (${resultadoGuardado.nombre}) y enviado a Mesa de Partes para firma digital. El certificador no registra la certificación definitiva.`
     );
+    // Igual que el mensaje, el documento y las páginas a certificar no deben
+    // quedarse pegados en pantalla una vez enviado a Mesa de Partes.
+    limpiarArchivo({ mantenerMensaje: true });
     cargarMisPendientesFirma();
   } catch (err) {
     console.error(err);
@@ -1815,6 +1941,7 @@ $("btnCancelarFirmaMesa")?.addEventListener("click", () => {
 });
 
 btnRegistrarFirmado?.addEventListener("click", async () => {
+  ocultarHash();
   if (!pendienteFirmaActual || !pdfFirmadoSeleccionado || !usuarioActual || !esUsuarioMesaPartes()) return;
 
   btnRegistrarFirmado.disabled = true;
@@ -2395,8 +2522,17 @@ function mostrarPagina(nombre) {
 
   if (nombre === "historial") cargarHistorial();
   if (nombre === "administracion") cargarAdministracion();
-  if (nombre === "firmar") { cargarPendientesFirma(); cargarMisDocumentosFirmados(); }
-  if (nombre === "certificar") cargarMisPendientesFirma();
+  if (nombre === "firmar") {
+    $("hashResultadoMesa")?.classList.add("oculto");
+    if (temporizadorHashResultadoMesa) { clearTimeout(temporizadorHashResultadoMesa); temporizadorHashResultadoMesa = null; }
+    cargarPendientesFirma();
+    cargarMisDocumentosFirmados();
+  }
+  if (nombre === "certificar") {
+    $("hashResultado")?.classList.add("oculto");
+    if (temporizadorHashResultado) { clearTimeout(temporizadorHashResultado); temporizadorHashResultado = null; }
+    cargarMisPendientesFirma();
+  }
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
