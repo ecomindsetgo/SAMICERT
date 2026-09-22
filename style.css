@@ -345,6 +345,19 @@ button{cursor:pointer}
 }
 .visor-modal-btn svg{width:14px;height:14px;flex:0 0 auto}
 .visor-modal-btn:hover{background:rgba(255,255,255,.22)}
+
+.visor-modal-btn:disabled{
+  opacity:.38;
+  cursor:not-allowed;
+}
+.visor-modal-seleccion{
+  min-width:115px;
+}
+.visor-modal-seleccion.activo{
+  background:rgba(22,130,58,.32);
+  border-color:rgba(130,220,155,.7);
+}
+
 .visor-modal-cerrar{padding:7px 10px}
 .visor-modal-area{
   flex:1;overflow:auto;background:#cbd5e1;border-radius:10px;
