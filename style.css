@@ -882,27 +882,29 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
     position:sticky;
     top:0;
     z-index:1000;
-    min-height:64px;
+    min-height:72px;
     padding:10px 12px;
     display:flex;
     align-items:center;
-    justify-content:flex-start;
+    justify-content:center;
     gap:10px;
-    text-align:left;
-    background:#fff;
-    color:var(--ink);
-    border-bottom:1px solid #e4e7ec;
-    box-shadow:0 2px 10px rgba(16,24,40,.08);
+    text-align:center;
+    background:linear-gradient(110deg,#05243a,#0a3554 65%,#0c4167);
+    color:#fff;
+    border-bottom:0;
+    box-shadow:0 4px 20px rgba(0,0,0,.10);
   }
-  .mobile-topbar-left{display:flex;flex:0 0 auto}
+  .mobile-topbar-left{
+    display:flex;flex:0 0 auto;position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:2;
+  }
   .mobile-menu-btn{
-    width:42px;height:42px;border:1px solid #d0d5dd;border-radius:10px;
-    background:#fff;display:flex;flex-direction:column;align-items:center;
-    justify-content:center;gap:4px;color:#344054;padding:0;
+    width:40px;height:40px;border:1px solid rgba(255,255,255,.55);border-radius:8px;
+    background:rgba(255,255,255,.08);display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:4px;color:#fff;padding:0;
   }
-  .mobile-menu-btn:hover{background:#f8fafc}
+  .mobile-menu-btn:hover{background:rgba(255,255,255,.16)}
   .mobile-menu-btn span{
-    display:block;width:18px;height:2px;border-radius:2px;background:#344054;
+    display:block;width:18px;height:2px;border-radius:2px;background:#fff;
     transition:transform .2s,opacity .2s;
   }
   .mobile-menu-btn.is-open span:nth-child(1){transform:translateY(6px) rotate(45deg)}
@@ -912,17 +914,18 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .top-title{
     min-width:0;
     flex:1;
-    text-align:left;
+    text-align:center;
+    padding:0 42px;
     overflow:hidden;
   }
   .top-title .long{
     font-size:9px;line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    color:#667085;
+    color:#dbe8f2;
   }
-  .top-title .sam{font-size:22px;letter-spacing:1.5px;line-height:1;font-weight:900;color:#182230}
+  .top-title .sam{font-size:22px;letter-spacing:1.5px;line-height:1;font-weight:900;color:#fff}
   .top-title .sub{
-    font-size:9px;margin-top:2px;color:#667085;
+    font-size:9px;margin-top:2px;color:#dbe8f2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
 
@@ -953,9 +956,9 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
     overflow-x:hidden;
     transform:translateX(-105%);
     transition:transform .25s ease;
-    box-shadow:12px 0 30px rgba(16,24,40,.22);
-    background:linear-gradient(180deg,#101828 0%,#0d1525 100%);
-    border-right:1px solid rgba(255,255,255,.06);
+    box-shadow:12px 0 30px rgba(0,0,0,.25);
+    background:linear-gradient(180deg,#041f33,#062b45);
+    border-right:1px solid rgba(255,255,255,.10);
   }
   .sidebar.menu-abierto{transform:translateX(0)}
 
@@ -971,7 +974,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .sidebar .logo{width:42px;height:42px;gap:3px}
   .sidebar-title{
     max-width:none;
-    font-size:9px;line-height:1.25;color:#d0d5dd;
+    font-size:9px;line-height:1.25;color:#d8e4ee;
   }
   .sidebar-title strong{
     font-size:24px;line-height:1;margin-bottom:4px;
@@ -996,18 +999,18 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
     gap:10px;
     font-size:12px;
     line-height:1.2;
-    color:#cbd5e1;
-    font-weight:500;
+    color:#e6eef5;
+    font-weight:600;
   }
   .nav-btn:hover{background:rgba(255,255,255,.07);color:#fff}
   .nav-btn.active{
-    background:linear-gradient(90deg,rgba(154,23,53,.95),rgba(122,0,25,.82));
+    background:linear-gradient(90deg,#0e5a91,#0b4772);
     color:#fff;
     box-shadow:0 5px 14px rgba(0,0,0,.15);
   }
   .nav-icon{
     width:30px;height:30px;flex:0 0 30px;
-    border-radius:8px;background:rgba(255,255,255,.05);
+    border-radius:8px;background:rgba(255,255,255,.06);
   }
   .nav-btn.active .nav-icon{background:rgba(255,255,255,.13)}
   .nav-icon svg{width:18px;height:18px}
@@ -1015,7 +1018,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .sidebar-footer{
     margin-top:auto;
     padding:14px 16px 18px;
-    font-size:9px;line-height:1.5;color:#98a2b3;
+    font-size:9px;line-height:1.5;color:#b8c9d6;
     border-top:1px solid rgba(255,255,255,.06);
   }
 
@@ -1024,7 +1027,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
     position:fixed;
     inset:0;
     z-index:1050;
-    background:rgba(16,24,40,.52);
+    background:rgba(4,31,51,.58);
     opacity:0;
     pointer-events:none;
     transition:opacity .25s ease;
