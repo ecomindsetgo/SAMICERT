@@ -2536,8 +2536,49 @@ function mostrarPagina(nombre) {
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
+
+// Menú lateral móvil estilo SAAMIR
+const btnMenuMovil = $("btnMenuMovil");
+const sidebarMovil = document.querySelector(".sidebar");
+const sidebarBackdrop = $("sidebarBackdrop");
+
+function cerrarMenuMovil(){
+  if (!sidebarMovil) return;
+  sidebarMovil.classList.remove("menu-abierto");
+  sidebarBackdrop?.classList.remove("show");
+  btnMenuMovil?.classList.remove("is-open");
+  btnMenuMovil?.setAttribute("aria-expanded","false");
+  sidebarBackdrop?.setAttribute("aria-hidden","true");
+  document.body.classList.remove("menu-movil-abierto");
+}
+
+function abrirMenuMovil(){
+  if (!sidebarMovil) return;
+  sidebarMovil.classList.add("menu-abierto");
+  sidebarBackdrop?.classList.add("show");
+  btnMenuMovil?.classList.add("is-open");
+  btnMenuMovil?.setAttribute("aria-expanded","true");
+  sidebarBackdrop?.setAttribute("aria-hidden","false");
+  document.body.classList.add("menu-movil-abierto");
+}
+
+function toggleMenuMovil(){
+  if (sidebarMovil?.classList.contains("menu-abierto")) cerrarMenuMovil();
+  else abrirMenuMovil();
+}
+
+btnMenuMovil?.addEventListener("click", toggleMenuMovil);
+sidebarBackdrop?.addEventListener("click", cerrarMenuMovil);
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") cerrarMenuMovil();
+});
+
 document.querySelectorAll(".nav-btn").forEach(btn => {
-  btn.addEventListener("click", () => mostrarPagina(btn.dataset.page));
+  btn.addEventListener("click", () => {
+    mostrarPagina(btn.dataset.page);
+    if (window.matchMedia("(max-width: 800px)").matches) cerrarMenuMovil();
+  });
 });
 
 document.querySelectorAll("[data-go]").forEach(btn => {

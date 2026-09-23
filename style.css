@@ -864,3 +864,200 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .topbar { padding:9px 14px; }
   .top-title .sam { font-size:24px; }
 }
+
+/* =========================================================
+   SAMICERT — MENÚ LATERAL MÓVIL ESTILO SAAMIR
+   El menú se convierte en un drawer lateral en teléfonos.
+   No modifica la lógica funcional del sistema.
+   ========================================================= */
+
+.mobile-topbar-left{display:none}
+.sidebar-backdrop{display:none}
+
+@media (max-width:800px){
+  .app-shell{display:block;min-height:100dvh}
+
+  /* Barra superior compacta */
+  .topbar{
+    position:sticky;
+    top:0;
+    z-index:1000;
+    min-height:64px;
+    padding:10px 12px;
+    display:flex;
+    align-items:center;
+    justify-content:flex-start;
+    gap:10px;
+    text-align:left;
+    background:#fff;
+    color:var(--ink);
+    border-bottom:1px solid #e4e7ec;
+    box-shadow:0 2px 10px rgba(16,24,40,.08);
+  }
+  .mobile-topbar-left{display:flex;flex:0 0 auto}
+  .mobile-menu-btn{
+    width:42px;height:42px;border:1px solid #d0d5dd;border-radius:10px;
+    background:#fff;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:4px;color:#344054;padding:0;
+  }
+  .mobile-menu-btn:hover{background:#f8fafc}
+  .mobile-menu-btn span{
+    display:block;width:18px;height:2px;border-radius:2px;background:#344054;
+    transition:transform .2s,opacity .2s;
+  }
+  .mobile-menu-btn.is-open span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+  .mobile-menu-btn.is-open span:nth-child(2){opacity:0}
+  .mobile-menu-btn.is-open span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+
+  .top-title{
+    min-width:0;
+    flex:1;
+    text-align:left;
+    overflow:hidden;
+  }
+  .top-title .long{
+    font-size:9px;line-height:1.2;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    color:#667085;
+  }
+  .top-title .sam{font-size:22px;letter-spacing:1.5px;line-height:1;font-weight:900;color:#182230}
+  .top-title .sub{
+    font-size:9px;margin-top:2px;color:#667085;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+
+  .user-area{
+    min-width:0;flex:0 0 auto;gap:6px;justify-content:flex-end;
+  }
+  .user-info{display:none}
+  .avatar{width:36px;height:36px;border:1px solid #d0d5dd;background:#f8fafc;color:#475467}
+  .avatar svg{width:18px;height:18px}
+  .btn-password{
+    display:none;
+  }
+  .btn-logout{
+    min-height:36px;padding:7px 9px;font-size:9px;
+    border-radius:8px;
+  }
+
+  /* Drawer lateral */
+  .sidebar{
+    position:fixed;
+    left:0;top:0;bottom:0;
+    width:274px;
+    max-width:86vw;
+    height:100dvh;
+    padding:0;
+    z-index:1100;
+    overflow-y:auto;
+    overflow-x:hidden;
+    transform:translateX(-105%);
+    transition:transform .25s ease;
+    box-shadow:12px 0 30px rgba(16,24,40,.22);
+    background:linear-gradient(180deg,#101828 0%,#0d1525 100%);
+    border-right:1px solid rgba(255,255,255,.06);
+  }
+  .sidebar.menu-abierto{transform:translateX(0)}
+
+  .sidebar-brand{
+    min-height:92px;
+    display:flex;
+    align-items:center;
+    justify-content:flex-start;
+    gap:12px;
+    padding:16px 16px 14px;
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  .sidebar .logo{width:42px;height:42px;gap:3px}
+  .sidebar-title{
+    max-width:none;
+    font-size:9px;line-height:1.25;color:#d0d5dd;
+  }
+  .sidebar-title strong{
+    font-size:24px;line-height:1;margin-bottom:4px;
+    color:#fff;letter-spacing:.08em;
+  }
+
+  .nav{
+    padding:12px 10px 10px;
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+  }
+  .nav-btn{
+    width:100%;
+    min-height:44px;
+    padding:8px 11px;
+    border-radius:9px;
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    justify-content:flex-start;
+    gap:10px;
+    font-size:12px;
+    line-height:1.2;
+    color:#cbd5e1;
+    font-weight:500;
+  }
+  .nav-btn:hover{background:rgba(255,255,255,.07);color:#fff}
+  .nav-btn.active{
+    background:linear-gradient(90deg,rgba(154,23,53,.95),rgba(122,0,25,.82));
+    color:#fff;
+    box-shadow:0 5px 14px rgba(0,0,0,.15);
+  }
+  .nav-icon{
+    width:30px;height:30px;flex:0 0 30px;
+    border-radius:8px;background:rgba(255,255,255,.05);
+  }
+  .nav-btn.active .nav-icon{background:rgba(255,255,255,.13)}
+  .nav-icon svg{width:18px;height:18px}
+
+  .sidebar-footer{
+    margin-top:auto;
+    padding:14px 16px 18px;
+    font-size:9px;line-height:1.5;color:#98a2b3;
+    border-top:1px solid rgba(255,255,255,.06);
+  }
+
+  .sidebar-backdrop{
+    display:block;
+    position:fixed;
+    inset:0;
+    z-index:1050;
+    background:rgba(16,24,40,.52);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease;
+  }
+  .sidebar-backdrop.show{
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .main{
+    margin-left:0;
+    width:100%;
+    min-width:0;
+  }
+  .content{padding:14px 12px 30px}
+
+  /* El contenido se adapta sin producir scroll horizontal */
+  .cards{grid-template-columns:1fr}
+  .panel{max-width:100%;overflow:hidden}
+  table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  input,select,textarea{max-width:100%}
+}
+
+@media(max-width:480px){
+  .topbar{min-height:60px;padding:9px 10px}
+  .mobile-menu-btn{width:40px;height:40px}
+  .top-title .sam{font-size:20px}
+  .top-title .long{font-size:8.5px}
+  .top-title .sub{font-size:8.5px}
+  .btn-logout{font-size:8.5px;padding:7px 8px}
+  .sidebar{width:268px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .sidebar,.sidebar-backdrop,.mobile-menu-btn span{transition:none}
+}
