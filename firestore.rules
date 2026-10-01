@@ -23,20 +23,29 @@ service cloud.firestore {
         request.auth.token.email == "archivocsjsanta@pj.gob.pe";
     }
 
+    function esVistoBueno() {
+      return request.auth != null &&
+        (request.auth.uid == "nTTcQeP0Z1Q7hh5YTKQyuvpgvS62" ||
+         request.auth.token.email == "rrodriguezcal@pj.gob.pe");
+    }
+
     match /usuarios/{uid} {
       allow read: if esAdministrador() ||
         (esCertificador() && request.auth.uid == uid) ||
-        (esMesaPartes() && request.auth.uid == uid);
+        (esMesaPartes() && request.auth.uid == uid) ||
+        (esVistoBueno() && request.auth.uid == uid);
 
       allow create: if
         (esAdministrador() && request.auth.uid == uid) ||
         (esCertificador() && request.auth.uid == uid) ||
-        (esMesaPartes() && request.auth.uid == uid);
+        (esMesaPartes() && request.auth.uid == uid) ||
+        (esVistoBueno() && request.auth.uid == uid);
 
       allow update: if
         (esAdministrador() && request.auth.uid == uid) ||
         (esCertificador() && request.auth.uid == uid) ||
-        (esMesaPartes() && request.auth.uid == uid);
+        (esMesaPartes() && request.auth.uid == uid) ||
+        (esVistoBueno() && request.auth.uid == uid);
 
       allow delete: if false;
     }
@@ -75,6 +84,28 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if esAdministrador() || esMesaPartes();
       }
+    }
+
+
+    // Trazabilidad del primer paso: documentos que recibieron Visto Bueno.
+    match /documentosVB/{documentoId} {
+      allow read: if esAdministrador() || esCertificador() || esVistoBueno();
+      allow create: if esVistoBueno()
+        && request.resource.data.vbUid == request.auth.uid
+        && request.resource.data.estado == "pendiente-certificador";
+      // El usuario de VB puede actualizar/cancelar únicamente sus propios registros.
+      // Se acepta UID o correo para mantener compatibilidad con registros creados
+      // en versiones anteriores que no guardaban vbUid.
+      allow update: if esAdministrador() || esCertificador() ||
+        (esVistoBueno() &&
+          (resource.data.vbUid == request.auth.uid ||
+           resource.data.vbEmail == request.auth.token.email ||
+           (!resource.data.vbUid && !resource.data.vbEmail &&
+            resource.data.estado == "pendiente-certificador")));
+
+      // La acción de Raúl es una cancelación lógica (estado = cancelado),
+      // no un borrado físico. Se mantiene delete solo para administrador.
+      allow delete: if esAdministrador();
     }
 
     match /certificaciones/{certificacionId} {

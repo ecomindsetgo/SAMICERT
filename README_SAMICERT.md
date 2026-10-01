@@ -1,3 +1,22 @@
+### v2.8.0 — Flujo Visto Bueno, bandejas y administración por usuario
+- Se mantiene como base funcional la versión inicial `samicert-main (3)`.
+- Raúl puede cargar un PDF, revisar páginas, colocar el sello de Visto Bueno y guardar una copia `[VB].pdf`.
+- Se registra una bandeja Firestore `documentosVB` para los VB emitidos por Raúl.
+- Raúl puede cancelar el VB o eliminar el registro de la bandeja mientras corresponda.
+- Los certificadores ven en su bandeja los documentos con estado `pendiente-certificador`; desde allí el flujo de certificación continúa con el proceso existente.
+- Administración separa los registros por etapa y usuario responsable y muestra las certificaciones definitivas como `Completados`.
+- El detalle por usuario también agrupa los registros para evitar mezclarlos.
+- El historial de certificaciones deduplica registros definitivos usando la huella SHA-256 final cuando está disponible y claves de respaldo para registros antiguos.
+- El respaldo administrativo incluye las colecciones `documentosVB`, `pendientesFirma` y `certificaciones`.
+- El PDF no se almacena en Firebase Storage; se conserva mediante la carpeta compartida/local según el flujo institucional.
+
+### v2.3.0 — Módulo de Visto Bueno
+- Se incorporó el usuario de Visto Bueno `rrodriguezcal@pj.gob.pe` (UID `nTTcQeP0Z1Q7hh5YTKQyuvpgvS62`).
+- El módulo de Visto Bueno permite cargar un PDF, revisar las páginas con las mismas herramientas de vista previa, selección, ampliación y rotación del certificador, colocar el sello de VB en las páginas seleccionadas y guardar una copia con sufijo `[VB]`.
+- El sello VB usa una posición separada del borde para no interferir con los folios inferiores.
+- Los certificadores pueden buscar una carpeta compartida y cargar directamente los archivos que terminan en `[VB].pdf`; el flujo de certificación existente continúa normalmente y el `[VB]` no se duplica en el nombre `[SF]`.
+- No se utiliza Firebase Storage para los PDF del flujo VB.
+
 # SAMICERT v2.0.0
 
 ## Sistema

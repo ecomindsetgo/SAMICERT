@@ -65,17 +65,19 @@
 
     <nav class="nav">
       <button class="nav-btn active" data-page="inicio"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9"/></svg></span>Inicio</button>
+      <button class="nav-btn oculto" id="navVistoBueno" data-page="vistoBueno"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8 12.2 2.5 2.5L16.5 9"/></svg></span>Visto Bueno</button>
       <button class="nav-btn" data-page="certificar"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="m9.5 14.5 2 2 4-4.5"/></svg></span>Certificar Documento</button>
       <button class="nav-btn" data-page="verificar"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6v5.2c0 4.6 3 7.9 7 9.3 4-1.4 7-4.7 7-9.3V6l-7-2.5Z"/><path d="m9 12 2 2 4-4.5"/></svg></span>Verificar Documento</button>
       <button class="nav-btn oculto" id="navFirmar" data-page="firmar"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="m7 16 9-9 3 3-9 9H7v-3Z"/><path d="M14 7 16 5l3 3-2 2"/></svg></span>Firmar y remitir</button>
       <button class="nav-btn" data-page="historial"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9a8.5 8.5 0 1 1 1 8.4"/><path d="M3.5 4.5v4.5H8"/><path d="M12 8.5v4l3 2"/></svg></span>Historial de Certificaciones</button>
       <button class="nav-btn" data-page="acerca"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M12 11v5.3"/><circle cx="12" cy="8" r=".9" fill="currentColor" stroke="none"/></svg></span>Acerca de SAMICERT</button>
       <button class="nav-btn" data-page="seguridad"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="1.6"/><path d="M8.5 10.5V7a3.5 3.5 0 0 1 7 0v3.5"/><circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg></span>Seguridad / Contraseña</button>
+      <button class="nav-btn oculto" id="navDetalleUsuarios" data-page="detalleUsuarios"><span class="nav-icon">≡</span>Detalle por usuario</button>
       <button class="nav-btn oculto" id="navAdministracion" data-page="administracion"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="15" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="9" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="16" cy="18" r="2"/></svg></span>Administración</button>
     </nav>
 
     <div class="sidebar-footer">
-      SAMICERT v2.2.0<br>
+      SAMICERT v2.8.0<br>
       Creado por Alfredo Raúl Cruzado Palacios<br>
       © 2026 Poder Judicial del Perú
     </div>
@@ -115,6 +117,15 @@
           <p>Seleccione una opción del menú para comenzar.</p>
           <div class="info-strip">
             <strong>Certificación automática:</strong> el sello se asigna automáticamente según el usuario que inició sesión. El sistema no permite cambiarlo desde la pantalla.
+          </div>
+        </div>
+
+        <div class="home-card card-vb oculto" id="cardInicioVistoBueno" style="margin-bottom:18px">
+          <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8 12.2 2.5 2.5L16.5 9"/></svg></div>
+          <div>
+            <h3>Visto Bueno de copias</h3>
+            <p>Raúl puede cargar el PDF, colocar su Visto Bueno y guardarlo en la carpeta compartida con el sufijo <strong>[VB]</strong>.</p>
+            <button class="btn-card" data-go="vistoBueno">Ir a Visto Bueno</button>
           </div>
         </div>
 
@@ -171,23 +182,66 @@
       </section>
 
       
+      <section class="page" id="page-vistoBueno">
+        <div class="section-head">
+          <h2>Visto Bueno de copias</h2>
+          <p>Módulo para cargar el PDF de copias, revisar sus páginas y colocar el Visto Bueno antes de enviarlo al flujo de certificación.</p>
+        </div>
+
+        <div class="panel" id="panelMisRegistrosVB">
+          <div class="panel-title">Mis documentos con Visto Bueno</div>
+          <div class="panel-subtitle">Revise los VB que ha registrado. Puede cancelar el VB o eliminar el registro si fue aplicado por error.</div>
+          <div id="bandejaVBListaVB" class="firma-pendientes-lista"><div class="empty">Cargando…</div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">1. Cargar documento</div>
+          <div class="panel-subtitle">Seleccione el PDF de copias. El documento original no se modifica.</div>
+          <div class="drop" id="dropVB">
+            <div class="icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8L14.5 3Z"/><path d="M14.5 3v4.5A1.5 1.5 0 0 0 16 9h4.5"/><path d="M9 13h6M9 16.5h6M9 9.5h2"/></svg></div>
+            <div class="txt1">Haz clic para seleccionar el PDF de copias</div>
+            <div class="txt2">También puede arrastrar y soltar el archivo aquí</div>
+            <input type="file" id="inputPdfVB" accept="application/pdf,.pdf" class="input-oculto" aria-hidden="true">
+          </div>
+          <div id="archivoVBSeleccionado" class="vb-archivo oculto"></div>
+        </div>
+
+        <div class="panel" id="panelVBPrevisualizacion">
+          <div class="panel-title">2. Vista previa y colocación del Visto Bueno</div>
+          <div class="panel-subtitle">El sello se aplicará a todas las páginas del PDF seleccionadas. Posición: superior derecha, con separación del borde.</div>
+          <div id="vbEstado" class="hash-resultado oculto"></div>
+          <div id="selectorPaginasVB" class="selector-paginas oculto">
+            <div class="selector-cabecera">
+              <div>
+                <div class="selector-titulo">Páginas para Visto Bueno</div>
+                <div class="selector-subtitulo" id="resumenPaginasVB">Selecciona las páginas que deseas marcar con VB. Usa la 🔍 para ampliar y el ↻ para rotar.</div>
+              </div>
+              <div class="selector-acciones">
+                <button type="button" class="btn-small" id="btnTodasVB">Todas</button>
+                <button type="button" class="btn-small" id="btnNingunaVB">Ninguna</button>
+                <button type="button" class="btn-small" id="btnInvertirVB">Invertir</button>
+              </div>
+            </div>
+            <div id="visorPaginasVB" class="visor-paginas"></div>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn-green" id="btnAplicarVB" disabled>Colocar VB y guardar</button>
+            <button type="button" class="btn-gray" id="btnLimpiarVB" disabled>Quitar documento</button>
+          </div>
+        </div>
+      </section>
+
       <section class="page" id="page-certificar">
         <div class="section-head">
           <h2>Certificar Documento</h2>
           <p>Seleccione el PDF y las páginas que serán certificadas. La certificación se registra recién después de importar el PDF firmado digitalmente.</p>
         </div>
 
-        <div class="panel" id="panelMisPendientes">
-          <div class="panel-title">Mis documentos enviados a Mesa de Partes (pendientes de firma)</div>
-          <div class="panel-subtitle">
-            Si envió un documento por error, puede cancelarlo aquí mientras siga "pendiente de firma".
-            Una vez que Mesa de Partes lo firma y registra, ya no aparece en esta lista.
-          </div>
-          <div id="misPendientesLista" class="firma-pendientes-lista">
-            <div class="empty">Cargando…</div>
-          </div>
+        <div class="panel" id="panelBandejaVB">
+          <div class="panel-title">Bandeja de documentos con Visto Bueno</div>
+          <div class="panel-subtitle">Documentos que ya recibieron VB y están listos para que el certificador los ubique en la carpeta compartida y continúe el flujo habitual.</div>
+          <div id="bandejaVBLista" class="firma-pendientes-lista"><div class="empty">Cargando…</div></div>
         </div>
-
         <div class="panel">
           <div class="panel-title">Documento PDF</div>
           <div class="panel-subtitle">El sello correspondiente al usuario que inició sesión se aplica automáticamente.</div>
@@ -218,26 +272,7 @@
           </div>
 
           
-          <div id="visorModal" class="visor-modal oculto" role="dialog" aria-modal="true" aria-label="Vista ampliada de página">
-            <div class="visor-modal-bar">
-              <div class="visor-modal-titulo" id="visorModalTitulo">Página</div>
-              <div class="visor-modal-controles">
-                <button type="button" class="visor-modal-btn" id="btnZoomMenos" aria-label="Reducir zoom"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
-                <span class="visor-modal-btn" id="visorZoomTexto">100%</span>
-                <button type="button" class="visor-modal-btn" id="btnZoomMas" aria-label="Aumentar zoom"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-                <button type="button" class="visor-modal-btn" id="btnZoomAjustar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></svg> Ajustar</button>
-                <button type="button" class="visor-modal-btn" id="btnRotarModal"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 3v5h-5"/></svg> Rotar</button>
-                <button type="button" class="visor-modal-btn" id="btnPaginaAnterior" title="Página anterior">‹ Anterior</button>
-                <button type="button" class="visor-modal-btn" id="btnPaginaSiguiente" title="Página siguiente">Siguiente ›</button>
-                <button type="button" class="visor-modal-btn visor-modal-seleccion" id="btnAlternarSeleccionModal">✓ Certificar</button>
-                <button type="button" class="visor-modal-btn visor-modal-cerrar" id="btnCerrarVisorModal" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
-              </div>
-            </div>
-            <div class="visor-modal-area" id="visorModalArea">
-              <canvas id="visorModalCanvas"></canvas>
-            </div>
-            <div class="visor-modal-ayuda">Use ‹ Anterior / Siguiente › para cambiar de página sin cerrar el visor. También puede usar ←/→. Con ✓ Certificar / No certificar puede cambiar la selección directamente desde este visor.</div>
-          </div>
+
 
           <div class="fixed-config">
             <strong>Configuración fija del sello:</strong> tamaño <strong>109 pt</strong> · margen <strong>3 pt</strong>. El sello no puede modificarse desde la aplicación y se selecciona automáticamente según el usuario autenticado.
@@ -261,6 +296,17 @@
 
           <div id="hashResultado" class="hash-resultado oculto"></div>
         </div>
+              <div class="panel" id="panelMisPendientes">
+          <div class="panel-title">Mis documentos enviados a Mesa de Partes (pendientes de firma)</div>
+          <div class="panel-subtitle">
+            Si envió un documento por error, puede cancelarlo aquí mientras siga "pendiente de firma".
+            Una vez que Mesa de Partes lo firma y registra, ya no aparece en esta lista.
+          </div>
+          <div id="misPendientesLista" class="firma-pendientes-lista">
+            <div class="empty">Cargando…</div>
+          </div>
+        </div>
+
       </section>
 
       
@@ -408,6 +454,8 @@
 
       
       
+      <section class="page" id="page-detalleUsuarios"><div class="section-head"><h2>Detalle por usuario</h2><p>Consulte los documentos con Visto Bueno, procesados por certificador y firmados por Mesa de Partes.</p></div><div class="panel"><label for="filtroDetalleEtapa"><strong>Etapa del documento</strong></label><select id="filtroDetalleEtapa" class="history-select"><option value="vb">Documentos con Visto Bueno</option><option value="procesados">Documentos procesados por certificador</option><option value="mesa">Documentos con firma de Mesa de Partes</option></select></div><div id="historialDetalleUsuarios" class="admin-history-etapas"></div></section>
+
       <section class="page" id="page-administracion">
         <div class="section-head">
           <h2>Administración de SAMICERT</h2>
@@ -437,8 +485,7 @@
             Seleccione registros que correspondan a pruebas o errores y elimínelos. Esta operación es irreversible desde la aplicación.
           </div>
           <div class="admin-note">
-            <strong>Recomendación:</strong> genere un respaldo antes de eliminar información.
-            Las reglas de Firebase impiden que los certificadores eliminen registros.
+            <strong>Recomendación:</strong> genere un respaldo antes de eliminar información. Las reglas de Firebase impiden que los certificadores eliminen registros.
           </div>
           <div class="admin-toolbar">
             <button class="btn-small" id="btnSeleccionarTodosAdmin">Seleccionar todos</button>
@@ -546,6 +593,27 @@
     </div>
   </main>
 </div>
+
+          <div id="visorModal" class="visor-modal oculto" role="dialog" aria-modal="true" aria-label="Vista ampliada de página">
+            <div class="visor-modal-bar">
+              <div class="visor-modal-titulo" id="visorModalTitulo">Página</div>
+              <div class="visor-modal-controles">
+                <button type="button" class="visor-modal-btn" id="btnZoomMenos" aria-label="Reducir zoom"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+                <span class="visor-modal-btn" id="visorZoomTexto">100%</span>
+                <button type="button" class="visor-modal-btn" id="btnZoomMas" aria-label="Aumentar zoom"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+                <button type="button" class="visor-modal-btn" id="btnZoomAjustar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></svg> Ajustar</button>
+                <button type="button" class="visor-modal-btn" id="btnRotarModal"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 3v5h-5"/></svg> Rotar</button>
+                <button type="button" class="visor-modal-btn" id="btnPaginaAnterior" title="Página anterior">‹ Anterior</button>
+                <button type="button" class="visor-modal-btn" id="btnPaginaSiguiente" title="Página siguiente">Siguiente ›</button>
+                <button type="button" class="visor-modal-btn visor-modal-seleccion" id="btnAlternarSeleccionModal">✓ Certificar</button>
+                <button type="button" class="visor-modal-btn visor-modal-cerrar" id="btnCerrarVisorModal" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+              </div>
+            </div>
+            <div class="visor-modal-area" id="visorModalArea">
+              <canvas id="visorModalCanvas"></canvas>
+            </div>
+            <div class="visor-modal-ayuda" id="visorModalAyuda">Use ‹ Anterior / Siguiente › para cambiar de página sin cerrar el visor. También puede usar ←/→. Con ✓ Certificar / No certificar puede cambiar la selección directamente desde este visor.</div>
+          </div>
 
 <div id="modalRecert" class="modal-recert oculto" role="dialog" aria-modal="true" aria-labelledby="modalRecertTitulo">
   <div class="modal-recert-caja">
