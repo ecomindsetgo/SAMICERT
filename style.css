@@ -492,7 +492,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
 }
 
 
-/* ═══════════ CONTROL DE DUPLICADOS / RECERTIFICACIONES ═══════════ */
+
 .alerta-duplicado {
   margin: 14px 0;
   padding: 14px 16px;
@@ -524,7 +524,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
 .dup-solape   { background:#fde7e4; border:1px solid #f5c2bb; color:#8a1c12; padding:10px 12px; border-radius:6px; margin:10px 0; font-size:13.5px; }
 .dup-nosolape { background:#eef6ef; border:1px solid #cbe3ce; color:#1f5f2e; padding:10px 12px; border-radius:6px; margin:10px 0; font-size:13.5px; }
 
-/* Modal de confirmación */
+
 .modal-recert {
   position:fixed; inset:0; z-index:9999;
   background:rgba(15,23,32,.62);
@@ -558,7 +558,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
 .firma-upload{margin-top:12px}
 .firma-actions{margin-top:12px}
 
-/* ═══════════ BANDEJA DE FIRMA DE MESA DE PARTES ═══════════ */
+
 .firma-pendientes-lista{display:flex;flex-direction:column;gap:10px;margin-top:14px}
 .firma-pendiente-item{
   display:grid;grid-template-columns:160px 1fr auto;gap:14px;align-items:center;
@@ -575,16 +575,13 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
 }
 
 
-/* =========================================================
-   SAMICERT — ADAPTACIÓN RESPONSIVE / MÓVILES
-   Solo presentación y usabilidad. No modifica lógica JS.
-   ========================================================= */
+
 
 @media (max-width: 800px) {
   html { -webkit-text-size-adjust: 100%; }
   body { overflow-x: hidden; }
 
-  /* Navegación móvil */
+  
   .app-shell { display:block; min-height:100dvh; }
   .sidebar {
     position:relative;
@@ -694,7 +691,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .panel-title { font-size:15px; }
   .panel-subtitle { font-size:11px; }
 
-  /* Formularios: controles cómodos para dedo */
+  
   input, select, textarea, button { max-width:100%; }
   input, select { min-height:42px; }
   .drop { padding:28px 14px; }
@@ -880,11 +877,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .top-title .sam { font-size:24px; }
 }
 
-/* =========================================================
-   SAMICERT — MENÚ LATERAL MÓVIL ESTILO SAAMIR
-   El menú se convierte en un drawer lateral en teléfonos.
-   No modifica la lógica funcional del sistema.
-   ========================================================= */
+
 
 .mobile-topbar-left{display:none}
 .sidebar-backdrop{display:none}
@@ -892,7 +885,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
 @media (max-width:800px){
   .app-shell{display:block;min-height:100dvh}
 
-  /* Barra superior compacta */
+  
   .topbar{
     position:sticky;
     top:0;
@@ -958,7 +951,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
     border-radius:8px;
   }
 
-  /* Drawer lateral */
+  
   .sidebar{
     position:fixed;
     left:0;top:0;bottom:0;
@@ -1059,7 +1052,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   }
   .content{padding:14px 12px 30px}
 
-  /* El contenido se adapta sin producir scroll horizontal */
+  
   .cards{grid-template-columns:1fr}
   .panel{max-width:100%;overflow:hidden}
   table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -1080,7 +1073,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .sidebar,.sidebar-backdrop,.mobile-menu-btn span{transition:none}
 }
 
-/* Bandeja VB discreta y coherente con la bandeja de enviados a Mesa de Partes */
+
 .vb-pendiente-item{grid-template-columns:minmax(180px,1fr) auto auto;background:#fbfcfe;border-color:#e5eaf0;padding:12px 14px}
 .vb-estado-sutil{font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;white-space:nowrap}
 .vb-pendiente-item .firma-pendiente-id{font-size:12px}
@@ -1088,7 +1081,7 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
 @media(max-width:800px){.vb-pendiente-item{grid-template-columns:1fr}.vb-estado-sutil{justify-self:start}}
 
 
-/* Administración: separación visual por etapa y usuario */
+
 .admin-completed-summary{
   display:grid;
   grid-template-columns:repeat(2,minmax(180px,1fr));
@@ -1158,3 +1151,14 @@ footer{text-align:center;color:#7b8795;font-size:10.5px;line-height:1.5;margin-t
   .admin-completed-summary{grid-template-columns:1fr}
   .admin-user-group-head{align-items:flex-start;flex-direction:column}
 }
+
+.audit-list{display:grid;gap:8px;margin-top:12px;max-height:430px;overflow:auto}
+.audit-item{display:grid;grid-template-columns:minmax(150px,210px) 1fr auto;gap:12px;align-items:start;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.audit-type{font-size:11px;font-weight:800;color:var(--navy);letter-spacing:.02em}
+.audit-detail{font-size:12px;color:#475569;line-height:1.45;word-break:break-word}
+.audit-date{font-size:11px;color:#64748b;white-space:nowrap;text-align:right}
+.admin-reason-field{margin:12px 0}
+.admin-reason-field textarea{width:100%;resize:vertical;min-height:78px;border:1px solid var(--line);border-radius:8px;padding:10px 11px;font:inherit;color:var(--text);background:#fff}
+.admin-reason-field textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,92,153,.1)}
+.firma-validacion-info{margin:12px 0;padding:11px 13px;border:1px solid #b9d7ea;border-radius:8px;background:#f2f9fd;color:#315166;font-size:12px;line-height:1.5}
+@media(max-width:800px){.audit-item{grid-template-columns:1fr}.audit-date{text-align:left}}

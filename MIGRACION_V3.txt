@@ -1,0 +1,15 @@
+SAMICERT v3.0.0 — PASOS DE MIGRACIÓN
+
+1. Haga una copia de seguridad de la versión actualmente publicada.
+2. Publique todos los archivos de esta carpeta en el sitio de SAMICERT.
+3. Publique firestore.rules en Firebase Firestore.
+4. Publique storage.rules en Firebase Storage.
+5. Ingrese a SAMICERT con la cuenta Administrador.
+6. Abra Administración y pulse "Sincronizar consulta pública".
+7. Espere el mensaje que indique el total de certificaciones sincronizadas.
+8. Pruebe al menos tres códigos QR históricos en verificar.html.
+9. Pruebe el flujo completo con un documento de prueba: VB, certificador, [SF], Firma ONPE, importación del firmado y consulta pública.
+10. Genere un respaldo desde Administración.
+
+IMPORTANTE
+La validación incorporada en SAMICERT comprueba estructura de firma PDF, ByteRange, contenedor PKCS#7/CAdES, identidad, páginas e integridad. La validación criptográfica completa de cadena de confianza, vigencia y revocación del certificado debe seguir realizándose con el software oficial o una infraestructura PKI autorizada.

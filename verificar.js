@@ -29,7 +29,6 @@ function ocultarResultados() {
 function rangosFolios(pags) {
   const orden = [...(pags || [])].sort((a, b) => a - b);
   if (!orden.length) return "";
-  // Agrupa en rangos: 1, 2, 3, 7 → "1-3, 7"
   const tramos = [];
   let ini = orden[0], prev = orden[0];
   for (let i = 1; i <= orden.length; i++) {
@@ -46,6 +45,9 @@ function mostrarRegistro(r) {
   $("dId").textContent = r.id || "";
   $("dFecha").textContent = `${r.fecha || ""} ${r.hora || ""}`.trim() + (r.zonaHoraria ? " (hora de Lima)" : "");
   $("dCertificador").textContent = r.certificadorNombre || "Usuario autorizado";
+  $("dFirma").textContent = r.firmaDigital
+    ? `${r.firmaDigitalTipo || "Firma digital"}${r.firmanteNombre ? ` · ${r.firmanteNombre}` : ""}${r.validacionFirmaEstructural ? " · estructura de firma validada" : ""}`
+    : "No indicada";
 
   const cantCertificadas = (r.paginasCertificadas || []).length;
   const rangos = rangosFolios(r.paginasCertificadas);
@@ -87,7 +89,7 @@ async function consultar(idCrudo) {
   $("cargando").classList.remove("oculto");
 
   try {
-    const snap = await getDoc(doc(db, "certificaciones", id));
+    const snap = await getDoc(doc(db, "certificacionesPublicas", id));
     $("cargando").classList.add("oculto");
     if (snap.exists()) {
       mostrarRegistro({ ...snap.data(), id: snap.data().id || snap.id });
@@ -148,7 +150,6 @@ $("inputPdf").addEventListener("change", async e => {
   }
 });
 
-// Enlace / QR de la constancia: ?consulta=CERT-AAAA-XXXXXXXXXXXX (también acepta ?id=)
 const params = new URLSearchParams(window.location.search);
 const idInicial = params.get("consulta") || params.get("id");
 if (idInicial) consultar(idInicial);

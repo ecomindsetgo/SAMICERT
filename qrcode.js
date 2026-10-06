@@ -330,7 +330,7 @@ var qrcode = function() {
           + ')';
       }
 
-      // end code
+      
       if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
         buffer.put(0, 4);
       }
@@ -472,7 +472,7 @@ var qrcode = function() {
       if (typeof arguments[0] == 'object') {
         
         opts = arguments[0];
-        // overwrite cellSize and margin.
+        
         cellSize = opts.cellSize;
         margin = opts.margin;
         alt = opts.alt;
@@ -763,10 +763,10 @@ var qrcode = function() {
           var b = unicodeMap[s.charAt(i)];
           if (typeof b == 'number') {
             if ( (b & 0xff) == b) {
-              // 1byte
+              
               bytes.push(b);
             } else {
-              // 2bytes
+              
               bytes.push(b >>> 8);
               bytes.push(b & 0xff);
             }
@@ -1077,7 +1077,7 @@ var qrcode = function() {
     var EXP_TABLE = new Array(256);
     var LOG_TABLE = new Array(256);
 
-    // initialize tables
+    
     for (var i = 0; i < 8; i += 1) {
       EXP_TABLE[i] = 1 << i;
     }
@@ -1681,7 +1681,7 @@ var qrcode = function() {
       throw 'sjis not supported.';
     }
     !function(c, code) {
-      // self test for sjis support.
+      
       var test = stringToBytes(c);
       if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
         throw 'sjis not supported.';
@@ -1798,7 +1798,7 @@ var qrcode = function() {
 
     var encode = function(n) {
       if (n < 0) {
-        // error.
+        
       } else if (n < 26) {
         return 0x41 + n;
       } else if (n < 52) {
@@ -1834,7 +1834,7 @@ var qrcode = function() {
       }
 
       if (_length % 3 != 0) {
-        // padding
+        
         var padlen = 3 - _length % 3;
         for (var i = 0; i < padlen; i += 1) {
           _base64 += '=';
@@ -1877,7 +1877,7 @@ var qrcode = function() {
           _buflen = 0;
           return -1;
         } else if (c.match(/^\s$/) ) {
-          // ignore if whitespace.
+          
           continue;
         }
 
@@ -1927,7 +1927,7 @@ var qrcode = function() {
       out.writeShort(_width);
       out.writeShort(_height);
 
-      out.writeByte(0x80); // 2bit
+      out.writeByte(0x80); 
       out.writeByte(0);
       out.writeByte(0);
 
