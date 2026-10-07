@@ -1,74 +1,142 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    function autenticado() { return request.auth != null; }
-    function esAdministrador() { return autenticado() && request.auth.uid == "OCsKdrDfB6h0Ey5RLjiWnvoOWqs1"; }
-    function esCertificador() { return autenticado() && (request.auth.uid == "wBCSJ3XfHVaUZPLmC2yJddh5RXx1" || request.auth.uid == "4tdNYgErvlM7NB3hwP933avL3RT2" || request.auth.token.email == "jdesposorio@pj.gob.pe" || request.auth.token.email == "rdavilaaa@pj.gob.pe"); }
-    function esMesaPartes() { return autenticado() && request.auth.token.email == "archivocsjsanta@pj.gob.pe"; }
-    function esVistoBueno() { return autenticado() && (request.auth.uid == "nTTcQeP0Z1Q7hh5YTKQyuvpgvS62" || request.auth.token.email == "rrodriguezcal@pj.gob.pe"); }
-    function esUsuarioSistema() { return esAdministrador() || esCertificador() || esMesaPartes() || esVistoBueno(); }
-    function clavesPublicasPermitidas() {
-      return request.resource.data.keys().hasOnly([
-        "id","fecha","hora","zonaHoraria","archivoCertificadoNombre","paginasCertificadas","totalPaginas","sha256","certificadorNombre","firmanteNombre","firmaDigital","firmaDigitalTipo","validacionFirmaEstructural","esRecertificacion","motivoRecertificacion","certificacionesPrevias","estado","versionSistema","publicadoEn"
-      ]);
+
+    function esAdministrador() {
+      return request.auth != null &&
+        request.auth.uid == "OCsKdrDfB6h0Ey5RLjiWnvoOWqs1";
+    }
+
+    function esCertificador() {
+      return request.auth != null &&
+        (
+          request.auth.uid == "wBCSJ3XfHVaUZPLmC2yJddh5RXx1" ||
+          request.auth.uid == "4tdNYgErvlM7NB3hwP933avL3RT2" ||
+          request.auth.token.email == "jdesposorio@pj.gob.pe" ||
+          request.auth.token.email == "rdavilaaa@pj.gob.pe"
+        );
+    }
+
+    function esMesaPartes() {
+      return request.auth != null &&
+        request.auth.token.email == "archivocsjsanta@pj.gob.pe";
+    }
+
+    function esVistoBueno() {
+      return request.auth != null &&
+        (request.auth.uid == "nTTcQeP0Z1Q7hh5YTKQyuvpgvS62" ||
+         request.auth.token.email == "rrodriguezcal@pj.gob.pe");
     }
 
     match /usuarios/{uid} {
-      allow read: if esAdministrador() || (esUsuarioSistema() && request.auth.uid == uid);
-      allow create, update: if esUsuarioSistema() && request.auth.uid == uid;
+      allow read: if esAdministrador() ||
+        (esCertificador() && request.auth.uid == uid) ||
+        (esMesaPartes() && request.auth.uid == uid) ||
+        (esVistoBueno() && request.auth.uid == uid);
+
+      allow create: if
+        (esAdministrador() && request.auth.uid == uid) ||
+        (esCertificador() && request.auth.uid == uid) ||
+        (esMesaPartes() && request.auth.uid == uid) ||
+        (esVistoBueno() && request.auth.uid == uid);
+
+      allow update: if
+        (esAdministrador() && request.auth.uid == uid) ||
+        (esCertificador() && request.auth.uid == uid) ||
+        (esMesaPartes() && request.auth.uid == uid) ||
+        (esVistoBueno() && request.auth.uid == uid);
+
       allow delete: if false;
     }
 
+    // Bandeja de documentos generados por los certificadores y pendientes de
+    // firma. Desde que se trabaja con una carpeta compartida, el documento
+    // en pendientesFirma solo guarda METADATOS: el certificador guarda el
+    // PDF [SF] directamente en disco (carpeta compartida) y Mesa de Partes
+    // lo ubica y firma desde ahí, ya no se descarga desde la app.
     match /pendientesFirma/{pendienteId} {
       allow read: if esAdministrador() || esCertificador() || esMesaPartes();
-      allow create: if esCertificador() && request.resource.data.certificadorUid == request.auth.uid && request.resource.data.estado == "pendiente-firma";
-      allow update: if (esMesaPartes() && resource.data.estado == "pendiente-firma" && request.resource.data.estado == "pendiente-firma") || (esCertificador() && resource.data.certificadorUid == request.auth.uid && resource.data.estado == "pendiente-firma" && request.resource.data.estado == "cancelado-certificador" && request.resource.data.canceladoPorUid == request.auth.uid);
-      allow delete: if esAdministrador() || (esMesaPartes() && existsAfter(/databases/$(database)/documents/certificaciones/$(pendienteId)) && getAfter(/databases/$(database)/documents/certificaciones/$(pendienteId)).data.firmanteUid == request.auth.uid && getAfter(/databases/$(database)/documents/certificaciones/$(pendienteId)).data.estado == "certificado");
+
+      allow create: if esCertificador()
+        && request.resource.data.certificadorUid == request.auth.uid
+        && request.resource.data.estado == "pendiente-firma";
+
+      allow update: if esMesaPartes()
+        && resource.data.estado == "pendiente-firma"
+        && request.resource.data.estado == "pendiente-firma";
+
+      // El certificador puede cancelar (eliminar) su propio documento
+      // mientras siga "pendiente-firma", por ejemplo si envió el archivo
+      // equivocado a Mesa de Partes.
+      allow delete: if esAdministrador() || esMesaPartes()
+        || (esCertificador()
+            && resource.data.certificadorUid == request.auth.uid
+            && resource.data.estado == "pendiente-firma");
+
+      // Ya no se archiva el PDF provisional en Firestore (viaja por la
+      // carpeta compartida), así que no se permiten nuevos chunks aquí.
+      // Se conserva el acceso de lectura/borrado por compatibilidad con
+      // registros antiguos que sí llegaron a archivar chunks.
       match /pdfChunks/{chunkId} {
         allow read: if esAdministrador() || esCertificador() || esMesaPartes();
-        allow create, update: if false;
+        allow create: if false;
+        allow update: if false;
         allow delete: if esAdministrador() || esMesaPartes();
       }
     }
 
+
+    // Trazabilidad del primer paso: documentos que recibieron Visto Bueno.
     match /documentosVB/{documentoId} {
       allow read: if esAdministrador() || esCertificador() || esVistoBueno();
-      allow create: if esVistoBueno() && request.resource.data.vbUid == request.auth.uid && request.resource.data.estado == "pendiente-certificador";
-      allow update: if esAdministrador() || (esCertificador() && resource.data.estado == "pendiente-certificador" && request.resource.data.estado == "procesado-certificador" && request.resource.data.certificadorUid == request.auth.uid) || (esVistoBueno() && (resource.data.vbUid == request.auth.uid || resource.data.vbEmail == request.auth.token.email || (!resource.data.vbUid && !resource.data.vbEmail && resource.data.estado == "pendiente-certificador")));
+      allow create: if esVistoBueno()
+        && request.resource.data.vbUid == request.auth.uid
+        && request.resource.data.estado == "pendiente-certificador";
+      // El usuario de VB puede actualizar/cancelar únicamente sus propios registros.
+      // Se acepta UID o correo para mantener compatibilidad con registros creados
+      // en versiones anteriores que no guardaban vbUid.
+      allow update: if esAdministrador() || esCertificador() ||
+        (esVistoBueno() &&
+          (resource.data.vbUid == request.auth.uid ||
+           resource.data.vbEmail == request.auth.token.email ||
+           (!resource.data.vbUid && !resource.data.vbEmail &&
+            resource.data.estado == "pendiente-certificador")));
+
+      // La acción de Raúl es una cancelación lógica (estado = cancelado),
+      // no un borrado físico. Se mantiene delete solo para administrador.
       allow delete: if esAdministrador();
     }
 
     match /certificaciones/{certificacionId} {
-      allow get, list: if esAdministrador() || esCertificador() || esMesaPartes();
-      allow create: if esMesaPartes() && exists(/databases/$(database)/documents/pendientesFirma/$(certificacionId)) && request.resource.data.certificadorUid == get(/databases/$(database)/documents/pendientesFirma/$(certificacionId)).data.certificadorUid && request.resource.data.firmanteUid == request.auth.uid && request.resource.data.estado == "certificado" && request.resource.data.validacionFirmaEstructural == true && request.resource.data.sha256Final is string && request.resource.data.sha256Final.size() == 64;
+      allow get: if true;
+      allow list: if esAdministrador() || esCertificador() || esMesaPartes();
+
+      // El certificador ya no crea la certificación definitiva.
+      // Mesa de Partes la crea después de verificar el PDF firmado.
+      allow create: if esMesaPartes()
+        && request.resource.data.certificadorUid ==
+          get(/databases/$(database)/documents/pendientesFirma/$(certificacionId)).data.certificadorUid
+        && request.resource.data.firmanteUid == request.auth.uid
+        && request.resource.data.estado == "certificado";
+
       allow update: if false;
       allow delete: if esAdministrador();
+
+      // Desde v15, el PDF final firmado ya NO se archiva en Firestore (viaja
+      // por la carpeta compartida). Se deja de permitir nuevos chunks aquí;
+      // solo se conserva lectura/borrado por compatibilidad con registros
+      // antiguos que sí llegaron a archivar el PDF en chunks.
       match /pdfChunks/{chunkId} {
         allow read: if esAdministrador() || esCertificador() || esMesaPartes();
-        allow create, update: if false;
+        allow create: if false;
+        allow update: if false;
         allow delete: if esAdministrador() || esMesaPartes();
       }
     }
 
-    match /certificacionesPublicas/{certificacionId} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if clavesPublicasPermitidas() && (esAdministrador() || (esMesaPartes() && existsAfter(/databases/$(database)/documents/certificaciones/$(certificacionId)) && request.resource.data.id == certificacionId && request.resource.data.estado == "certificado" && request.resource.data.sha256 == getAfter(/databases/$(database)/documents/certificaciones/$(certificacionId)).data.sha256Final));
-      allow update: if esAdministrador() && clavesPublicasPermitidas();
-      allow delete: if esAdministrador();
+    match /{document=**} {
+      allow read, write: if false;
     }
-
-    match /auditoria/{eventoId} {
-      allow read: if esAdministrador();
-      allow create: if esUsuarioSistema() && request.resource.data.actorUid == request.auth.uid && request.resource.data.tipo is string && request.resource.data.entidad is string && request.resource.data.entidadId is string;
-      allow update, delete: if false;
-    }
-
-    match /archivoEliminados/{archivoId} {
-      allow read, create: if esAdministrador();
-      allow update, delete: if false;
-    }
-
-    match /{document=**} { allow read, write: if false; }
   }
 }

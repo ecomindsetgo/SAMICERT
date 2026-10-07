@@ -4,125 +4,13 @@ import {
   EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, limit, getDocs, serverTimestamp, writeBatch
+  getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, limit, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 import { firebaseConfig, ADMIN_UID } from "./firebase-config.js";
 
 const appFirebase = initializeApp(firebaseConfig);
 const auth = getAuth(appFirebase);
 const db = getFirestore(appFirebase);
-
-
-const APP_VERSION = "3.0.0";
-
-function crearRefAuditoria() {
-  return doc(collection(db, "auditoria"));
-}
-
-function eventoAuditoria(tipo, entidad, entidadId, detalle = {}) {
-  return {
-    tipo,
-    entidad,
-    entidadId: String(entidadId || ""),
-    actorUid: usuarioActual?.uid || "",
-    actorNombre: perfilActual?.nombre || usuarioActual?.displayName || usuarioActual?.email || "Usuario",
-    actorEmail: usuarioActual?.email || "",
-    actorRol: perfilActual?.rol || (esAdministradorActual ? "administrador" : "usuario"),
-    detalle,
-    versionSistema: APP_VERSION,
-    creadoEn: serverTimestamp()
-  };
-}
-
-function datosPublicosCertificacion(registro) {
-  return {
-    id: registro.id,
-    fecha: registro.fecha || "",
-    hora: registro.hora || "",
-    zonaHoraria: registro.zonaHoraria || "America/Lima",
-    archivoCertificadoNombre: registro.archivoCertificadoNombre || "",
-    paginasCertificadas: Array.isArray(registro.paginasCertificadas) ? registro.paginasCertificadas : [],
-    totalPaginas: Number(registro.totalPaginas || 0),
-    sha256: registro.sha256Final || registro.sha256 || "",
-    certificadorNombre: registro.certificadorNombre || "Usuario autorizado",
-    firmanteNombre: registro.firmanteNombre || "Mesa de Partes",
-    firmaDigital: registro.firmaDigital === true,
-    firmaDigitalTipo: registro.firmaDigitalTipo || "FIRMA ONPE",
-    validacionFirmaEstructural: registro.validacionFirmaEstructural === true,
-    esRecertificacion: registro.esRecertificacion === true,
-    motivoRecertificacion: registro.esRecertificacion ? (registro.motivoRecertificacion || "") : "",
-    certificacionesPrevias: registro.esRecertificacion && Array.isArray(registro.certificacionesPrevias) ? registro.certificacionesPrevias : [],
-    estado: registro.estado || "certificado",
-    versionSistema: registro.versionSistema || APP_VERSION,
-    publicadoEn: serverTimestamp()
-  };
-}
-
-async function registrarAuditoria(tipo, entidad, entidadId, detalle = {}) {
-  if (!usuarioActual) return;
-  await setDoc(crearRefAuditoria(), eventoAuditoria(tipo, entidad, entidadId, detalle));
-}
-
-function textoBinarioAscii(bytes) {
-  return new TextDecoder("windows-1252").decode(bytes);
-}
-
-async function validarPdfFirmado(bytes, pendiente) {
-  if (!(bytes instanceof Uint8Array) || bytes.length < 1024) {
-    throw new Error("El archivo firmado está vacío o es demasiado pequeño para ser un PDF válido.");
-  }
-  const cabecera = new TextDecoder().decode(bytes.slice(0, 5));
-  if (cabecera !== "%PDF-") {
-    throw new Error("El archivo seleccionado no tiene una cabecera PDF válida (%PDF-).");
-  }
-  let pdf;
-  try {
-    pdf = await PDFLib.PDFDocument.load(bytes.slice(), { updateMetadata: false });
-  } catch (_) {
-    throw new Error("El archivo seleccionado no es un PDF válido o está dañado.");
-  }
-  const paginasEsperadas = Number(pendiente.totalPaginas || 0) + 1;
-  const paginasEncontradas = pdf.getPageCount();
-  if (!paginasEsperadas || paginasEncontradas !== paginasEsperadas) {
-    throw new Error(`El PDF firmado tiene ${paginasEncontradas} página(s), pero el provisional de esta certificación debe tener ${paginasEsperadas}.`);
-  }
-  const sha256Final = await calcularSHA256(bytes.slice());
-  const shaPreFirma = String(pendiente.sha256PreFirma || "").toLowerCase();
-  if (!shaPreFirma) {
-    throw new Error("Este pendiente fue creado sin huella SHA-256 previa a la firma. Por seguridad, debe cancelarlo y generar nuevamente el documento [SF].");
-  }
-  if (sha256Final.toLowerCase() === shaPreFirma) {
-    throw new Error("El archivo cargado es exactamente el mismo PDF provisional [SF]. Debe firmarlo digitalmente con Firma ONPE antes de registrarlo.");
-  }
-  const texto = textoBinarioAscii(bytes);
-  const rangos = [...texto.matchAll(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g)];
-  const firmas = [...texto.matchAll(/\/Type\s*\/Sig\b/g)];
-  const subfiltros = [...texto.matchAll(/\/SubFilter\s*\/([^\s<>\[\]()]+)/g)].map(m => m[1]);
-  const contenidos = [...texto.matchAll(/\/Contents\s*<([0-9A-Fa-f\s]{200,})>/g)];
-  if (!rangos.length || !firmas.length || !contenidos.length) {
-    throw new Error("No se detectó una estructura de firma digital PDF válida (firma, ByteRange y contenedor criptográfico). Firme el [SF] con Firma ONPE y vuelva a cargarlo.");
-  }
-  const subFiltro = subfiltros.find(v => /pkcs7|cades/i.test(v));
-  if (!subFiltro) {
-    throw new Error("El PDF contiene una firma, pero su SubFilter no corresponde a un contenedor PKCS#7/CAdES compatible con firmas PDF/PAdES.");
-  }
-  const ultimo = rangos[rangos.length - 1];
-  const nums = ultimo.slice(1).map(Number);
-  const [inicio, largo1, inicio2, largo2] = nums;
-  const byteRangeCoherente = inicio === 0 && largo1 > 0 && inicio2 > largo1 && largo2 > 0 && inicio2 + largo2 <= bytes.length;
-  if (!byteRangeCoherente) {
-    throw new Error("La estructura ByteRange de la firma digital no es coherente con el tamaño del PDF.");
-  }
-  return {
-    sha256Final,
-    paginasEsperadas,
-    paginasEncontradas,
-    subFiltro,
-    byteRange: nums,
-    firmasDetectadas: firmas.length,
-    validacionFirmaEstructural: true
-  };
-}
 
 const ICONOS = {
   lupa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.35-4.35"/></svg>',
@@ -142,12 +30,12 @@ if (window.pdfjsLib) {
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 }
 
-
-
-
-
-
-
+// NOTA v15: SAMICERT ya NO archiva el PDF certificado (ni el provisional ni
+// el final firmado) en Firestore. Ambos PDFs quedan únicamente en la
+// carpeta compartida (guardados en disco por el certificador y por Mesa de
+// Partes respectivamente). Esto evita las subidas en chunks a Firestore,
+// que eran lentas y hacían crecer la base de datos sin necesidad; Firestore
+// solo guarda los metadatos de cada certificación.
 const MESA_PARTES_EMAIL = "archivocsjsanta@pj.gob.pe";
 
 function esUsuarioMesaPartes(user = usuarioActual) {
@@ -161,9 +49,9 @@ function esUsuarioVistoBueno(user = usuarioActual) {
   return !!user && (user.uid === VISTO_BUENO_UID || (user.email || "").toLowerCase() === VISTO_BUENO_EMAIL);
 }
 
-
-
-
+// Se conserva eliminarPdfPendiente por compatibilidad con registros
+// antiguos que sí llegaron a archivar chunks en pendientesFirma/pdfChunks
+// o certificaciones/pdfChunks en versiones previas de SAMICERT.
 async function eliminarPdfPendiente(pendienteId, totalChunks = 0) {
   if (!totalChunks) return;
   for (let i = 0; i < totalChunks; i++) {
@@ -213,6 +101,7 @@ const panelFirma = $("panelFirma");
 const inputPdfFirmado = $("inputPdfFirmado");
 const archivoPdfFirmadoNombre = $("archivoPdfFirmadoNombre");
 const btnRegistrarFirmado = $("btnRegistrarFirmado");
+const btnCancelarFirma = $("btnCancelarFirma");
 
 let archivoSeleccionado = null;
 let resultadoBlob = null;
@@ -231,12 +120,12 @@ let temporizadorHashResultado = null;
 let temporizadorHashResultadoMesa = null;
 const TIEMPO_MENSAJE_EXITO_MS = 12000;
 
-
-
-
-
-
-
+// El sello físico mide 5x5 cm. En pruebas de impresión, 90pt se imprimió
+// como 2.9x2.9 cm (la escala real de impresión depende del PDF/impresora,
+// no coincide 1:1 con 1cm = 28.35pt). Usando esa proporción observada
+// (90pt → 2.9cm), 109pt equivale a ≈3.5x3.5 cm impresos: más visible que
+// antes sin llegar al tamaño real del sello físico. Si al probarlo aún se
+// ve pequeño, subir a ~124pt (≈4x4 cm); si se ve grande, bajar hacia 90-100pt.
 const TAMANO_SELLO_PT = 109;
 const MARGEN_SELLO_PT = 3;
 const ESQUINA_SELLO = "inferior-derecha";
@@ -310,11 +199,11 @@ async function calcularSHA256(bytes) {
 }
 
 
-let duplicadosDetectados = [];
-let hashOrigenActual = null;
+let duplicadosDetectados = [];   // certificaciones previas que coinciden
+let hashOrigenActual = null;     // SHA-256 del archivo original cargado
 
 async function buscarCertificacionesPrevias(hashOrigen, nombreArchivo) {
-  const encontrados = new Map();
+  const encontrados = new Map(); // id → { registro, porContenido, porNombre }
 
   const registrar = (docSnap, motivo) => {
     const data = docSnap.data();
@@ -355,7 +244,9 @@ async function buscarCertificacionesPrevias(hashOrigen, nombreArchivo) {
   });
 }
 
-
+/* Determina si las páginas que se van a certificar ahora se solapan con las
+   ya certificadas antes. Certificar folios distintos del mismo expediente es
+   una operación legítima; repetir los mismos folios no lo es. */
 function paginasSolapadas(previas, actuales) {
   const set = new Set(previas || []);
   return (actuales || []).filter(p => set.has(p));
@@ -843,6 +734,9 @@ function visorPaginas() {
 
 async function abrirVistaAmpliada(numero) {
   if (!pdfVista) return;
+  // Determinar el modo cada vez que se abre la lupa. Al cerrar el modal,
+  // visorModalModo vuelve a "certificar", por lo que debe restaurarse aquí
+  // según el visor desde el que se abrió.
   visorModalModo = visorPaginasActivoId === "visorPaginasVB" ? "vb" : "certificar";
   try {
     visorModalPaginaActual = numero;
@@ -1172,9 +1066,10 @@ async function guardarDocumentoVB() {
     }
 
     const resultado = await guardarResultado(bytes, nombreSalidaVB, handleDestino, null);
+    // Registrar el ingreso en la bandeja compartida de certificación. El PDF sigue guardándose en la carpeta compartida local.
     const vbId = (crypto.randomUUID ? crypto.randomUUID() : `VB-${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
     const ahoraVB = new Date();
-    const registroVB = {
+    await setDoc(doc(db, "documentosVB", vbId), {
       archivoOriginal: archivoVBActual.name,
       archivoVBNombre: resultado.nombre || nombreSalidaVB,
       estado: "pendiente-certificador",
@@ -1183,13 +1078,8 @@ async function guardarDocumentoVB() {
       vbEmail: usuarioActual.email || "",
       fecha: ahoraVB.toLocaleDateString("es-PE", {timeZone:"America/Lima"}),
       hora: ahoraVB.toLocaleTimeString("es-PE", {timeZone:"America/Lima"}),
-      creadoEn: serverTimestamp(),
-      versionSistema: APP_VERSION
-    };
-    const batchVB = writeBatch(db);
-    batchVB.set(doc(db, "documentosVB", vbId), registroVB);
-    batchVB.set(crearRefAuditoria(), eventoAuditoria("VISTO_BUENO_REGISTRADO", "documentosVB", vbId, { archivo: registroVB.archivoVBNombre }));
-    await batchVB.commit();
+      creadoEn: serverTimestamp()
+    });
     mostrarEstadoVB(`✓ Visto Bueno aplicado correctamente. Archivo guardado como ${resultado.nombre || nombreSalidaVB}.`);
     limpiarVistoBueno();
     mostrarEstadoVB(`✓ Visto Bueno aplicado correctamente. Archivo guardado como ${resultado.nombre || nombreSalidaVB}.`);
@@ -1320,6 +1210,11 @@ async function seleccionarPdf(file) {
 }
 
 function limpiarArchivo(opciones) {
+  // Se usa tanto para el botón "Quitar documento" (opciones = evento de click,
+  // por eso se ignora si no trae la forma esperada) como, con
+  // { mantenerMensaje: true }, justo después de generar el documento para
+  // firma: en ese caso NO se debe llamar a ocultarHash(), porque borraría de
+  // inmediato el mensaje de éxito recién mostrado.
   const mantenerMensaje = !!(opciones && opciones.mantenerMensaje);
 
   if (resultadoBlob) URL.revokeObjectURL(resultadoBlob);
@@ -1488,6 +1383,8 @@ async function cargarLogoParaQR() {
 }
 
 async function generarQRDataUrl(texto, tamanoPx = 1200) {
+  // QR de alta resolución, con zona de silencio de 4 módulos y corrección H.
+  // La zona de silencio mejora la apariencia y también ayuda a los lectores QR.
   const qr = qrcode(0, "H");
   qr.addData(texto);
   qr.make();
@@ -1504,6 +1401,7 @@ async function generarQRDataUrl(texto, tamanoPx = 1200) {
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
 
+  // Fondo blanco limpio y módulos negros de alto contraste.
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, size, size);
   ctx.fillStyle = "#111111";
@@ -1517,6 +1415,9 @@ async function generarQRDataUrl(texto, tamanoPx = 1200) {
 
   const logo = await cargarLogoParaQR();
   if (logo) {
+    // Versión refinada: el logo ocupa menos área para que el QR conserve
+    // muchos módulos visibles y el centro se perciba como parte del diseño.
+    // La corrección H se mantiene como respaldo frente al área cubierta.
     const caja = Math.round(qrSize * 0.22);
     const escala = Math.min(caja / logo.width, caja / logo.height);
     const w = Math.round(logo.width * escala);
@@ -1524,9 +1425,10 @@ async function generarQRDataUrl(texto, tamanoPx = 1200) {
     const cx = quiet + qrSize / 2;
     const cy = quiet + qrSize / 2;
 
+    // Medallón cuadrado con esquinas ligeramente redondeadas.
 const margen = Math.max(3, Math.round(cell * 0.6));
 const lado = Math.max(w, h) + margen * 2;
-const radioEsquina = Math.round(lado * 0.15);
+const radioEsquina = Math.round(lado * 0.15); // 0.15 = "ligeramente" redondeado
 
 ctx.save();
 ctx.beginPath();
@@ -1535,6 +1437,8 @@ ctx.fillStyle = "#ffffff";
 ctx.fill();
 ctx.restore();
 
+    // El logo se dibuja suavizado, pero los módulos del QR permanecen
+    // perfectamente definidos para conservar una lectura fiable.
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
@@ -1572,10 +1476,13 @@ function envolverTexto(texto, fuente, size, maxAncho) {
 
 async function obtenerLogoInstitucional(pdfDoc) {
   try {
+    // cache: "no-cache" evita usar una versión antigua del logo guardada por el navegador
     const resp = await fetch("./logo-institucional.png", { cache: "no-cache" });
     if (!resp.ok) throw new Error("sin logo institucional publicado");
     const bytes = new Uint8Array(await resp.arrayBuffer());
 
+    // Se detecta el formato real por los primeros bytes del archivo y no por su extensión:
+    // un JPEG guardado con nombre ".png" hacía fallar embedPng y se caía al marcador "PJ".
     const esPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
     const esJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
     if (esPng) return await pdfDoc.embedPng(bytes);
@@ -1587,6 +1494,7 @@ async function obtenerLogoInstitucional(pdfDoc) {
   }
 }
 
+// ── Carátula inicial del PDF final, según el diseño institucional ──────────
 async function crearPaginaCaratula(pdfDoc, resumen) {
   const { rgb, StandardFonts } = PDFLib;
   const fTitulo = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -1604,6 +1512,8 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
 
   const logo = await obtenerLogoInstitucional(pdfDoc);
   if (logo) {
+    // El logo institucional ya incluye la leyenda "Poder Judicial del Perú",
+    // por lo que no se repite el nombre de la institución debajo.
     const logoAncho = 150, logoAlto = 112;
     const escala = Math.min(logoAncho / logo.width, logoAlto / logo.height);
     const wLogo = logo.width * escala, hLogo = logo.height * escala;
@@ -1616,6 +1526,7 @@ async function crearPaginaCaratula(pdfDoc, resumen) {
     });
     y -= 34;
   } else {
+    // Sin logo publicado (o ilegible): marcador "PJ" + nombre de la institución
     const logoAncho = 96, logoAlto = 64;
     pagina.drawRectangle({
       x: width / 2 - logoAncho / 2, y: y - logoAlto, width: logoAncho, height: logoAlto,
@@ -1845,6 +1756,8 @@ async function aplicarSelloAUnPdf(file) {
     consultaUrl: `https://samicert.ecomindsetgo.com/verificar.html?consulta=${certId}`
   });
 
+  // Metadatos internos para que el PDF conserve su identidad durante el
+  // paso de firma externa. El SHA-256 definitivo NO se calcula aquí.
   pdfDoc.setTitle(`SAMICERT ${certId}`);
   pdfDoc.setSubject(`SAMICERT:${certId}`);
   pdfDoc.setKeywords(["SAMICERT", certId, "SF"]);
@@ -1870,6 +1783,9 @@ function nombreConSufijo(nombre) {
 }
 
 async function guardarResultado(bytesSalida, nombre, handleDestino, archivoFuente = null) {
+  // El ArrayBuffer leído del <input type=file> es la fuente de verdad del PDF firmado.
+  // No dependemos del objeto File para escribir en disco: algunos navegadores
+  // pueden exponer el File correctamente pero fallar al transferirlo al stream.
   const bytesFirmados = bytesSalida instanceof ArrayBuffer
     ? new Uint8Array(bytesSalida)
     : new Uint8Array(bytesSalida);
@@ -1881,6 +1797,8 @@ async function guardarResultado(bytesSalida, nombre, handleDestino, archivoFuent
   const bytesEsperados = bytesFirmados;
   const tamanoEsperado = bytesEsperados.byteLength;
 
+  // El PDF debe comenzar con la firma binaria %PDF-. Si no es así, no permitimos
+  // que el archivo se considere certificado.
   const cabecera = new TextDecoder().decode(bytesEsperados.slice(0, 5));
   if (cabecera !== "%PDF-") {
     throw new Error("El archivo firmado no tiene una cabecera PDF válida (%PDF-). No se guardó como PDF certificado.");
@@ -1890,6 +1808,8 @@ async function guardarResultado(bytesSalida, nombre, handleDestino, archivoFuent
     let writable = null;
     try {
       writable = await handleDestino.createWritable({ keepExistingData: false });
+      // Escritura binaria explícita. Evita que un Blob/File sea interpretado
+      // incorrectamente por el stream y garantiza que se escriban todos los bytes.
       await writable.write(bytesEsperados);
       await writable.truncate(tamanoEsperado);
       await writable.close();
@@ -1899,6 +1819,8 @@ async function guardarResultado(bytesSalida, nombre, handleDestino, archivoFuent
       throw new Error(`Windows/Chrome no pudo completar la escritura del PDF: ${e.message || e}`);
     }
 
+    // Volvemos a leer el archivo físico desde el handle, no el Blob en memoria.
+    // Esto confirma que el archivo realmente quedó en la ruta elegida.
     const archivoGuardado = await handleDestino.getFile();
     if (!archivoGuardado || archivoGuardado.size !== tamanoEsperado) {
       throw new Error(
@@ -1930,6 +1852,7 @@ async function guardarResultado(bytesSalida, nombre, handleDestino, archivoFuent
     };
   }
 
+  // Respaldo para navegadores que no soportan showSaveFilePicker.
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -2029,6 +1952,11 @@ btnAplicar.addEventListener("click", async () => {
     archivoSeleccionado.estado = "procesando";
     renderLista();
 
+    // El certificador genera el PDF provisional, pero NO firma ni registra
+    // la certificación definitiva. Como se trabaja sobre una carpeta
+    // compartida con Mesa de Partes, el PDF [SF] se guarda directamente en
+    // disco (eligiendo la carpeta compartida en el selector de guardado)
+    // en vez de archivarse en Firestore; solo se guardan sus metadatos.
     const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
     const sha256PreFirma = await calcularSHA256(resultado.bytesSalida);
     const pendienteId = resultado.meta.id;
@@ -2075,11 +2003,11 @@ btnAplicar.addEventListener("click", async () => {
       pdfChunksTotal: 0,
       pdfBytesTotal: resultado.bytesSalida.length,
       creadoEn: serverTimestamp(),
-      version: 30,
-      versionSistema: APP_VERSION
+      version: 14
     };
 
-    let vbMatchRef = null;
+    await setDoc(doc(db, "pendientesFirma", pendienteId), pendiente);
+    // Marcar el registro VB correspondiente como atendido por el certificador.
     try {
       const vbPendientes = await getDocs(collection(db, "documentosVB"));
       const nombreBase = String(resultado.meta.archivoOriginal || "").replace(/\[VB\](?=\.pdf$)/i, "").toLowerCase();
@@ -2087,26 +2015,13 @@ btnAplicar.addEventListener("click", async () => {
         const r = d.data();
         return r.estado === "pendiente-certificador" && String(r.archivoOriginal || "").replace(/\[VB\](?=\.pdf$)/i, "").toLowerCase() === nombreBase;
       });
-      if (vbMatch) vbMatchRef = doc(db, "documentosVB", vbMatch.id);
-    } catch (eVB) {
-      console.warn("No se pudo localizar el registro VB asociado:", eVB);
-    }
-
-    const batchPendiente = writeBatch(db);
-    batchPendiente.set(doc(db, "pendientesFirma", pendienteId), { ...pendiente, versionSistema: APP_VERSION });
-    batchPendiente.set(crearRefAuditoria(), eventoAuditoria("DOCUMENTO_ENVIADO_A_FIRMA", "pendientesFirma", pendienteId, { archivo: pendiente.archivoProvisionalNombre, paginasCertificadas: pendiente.paginasCertificadas }));
-    if (vbMatchRef) {
-      batchPendiente.set(vbMatchRef, {
-        estado: "procesado-certificador",
-        certificadorUid: usuarioActual.uid,
+      if (vbMatch) await setDoc(doc(db, "documentosVB", vbMatch.id), {
+        estado: "procesado-certificador", certificadorUid: usuarioActual.uid,
         certificadorNombre: perfilActual?.nombre || usuarioActual.displayName || usuarioActual.email || "",
-        certificadorEmail: usuarioActual.email || "",
-        pendienteFirmaId: pendienteId,
-        atendidoEn: serverTimestamp(),
-        versionSistema: APP_VERSION
-      }, { merge:true });
-    }
-    await batchPendiente.commit();
+        certificadorEmail: usuarioActual.email || "", pendienteFirmaId: pendienteId,
+        atendidoEn: serverTimestamp()
+      }, { merge: true });
+    } catch (eVB) { console.warn("No se pudo actualizar el estado del registro VB", eVB); }
 
     procesoFirmaPendiente = pendiente;
     archivoSeleccionado.estado = "enviado-firma";
@@ -2116,6 +2031,8 @@ btnAplicar.addEventListener("click", async () => {
     mostrarMensajeExitoTemporal(
       `✓ Documento ${pendienteId} guardado en la carpeta compartida (${resultadoGuardado.nombre}) y enviado a Mesa de Partes para firma digital. El certificador no registra la certificación definitiva.`
     );
+    // Igual que el mensaje, el documento y las páginas a certificar no deben
+    // quedarse pegados en pantalla una vez enviado a Mesa de Partes.
     limpiarArchivo({ mantenerMensaje: true });
     cargarMisPendientesFirma();
   } catch (err) {
@@ -2148,6 +2065,9 @@ inputPdfFirmado?.addEventListener("change", () => {
 
 let pendienteFirmaActual = null;
 
+// Permite al certificador ver los documentos que ÉL envió a Mesa de Partes
+// y que siguen "pendiente-firma", y cancelarlos si se equivocó de archivo
+// (por ejemplo, si generó el [SF] de un PDF que no correspondía).
 async function cargarMisPendientesFirma() {
   cargarBandejaVB();
   if (!usuarioActual || esUsuarioMesaPartes()) return;
@@ -2183,7 +2103,7 @@ async function cargarMisPendientesFirma() {
         </div>
         <div class="firma-pendiente-actions">
           <button type="button" class="btn-gray btn-small btn-cancelar-pendiente" data-id="${escapeHtml(r.id)}">
-            Cancelar envío
+            Cancelar / eliminar
           </button>
         </div>
       </div>
@@ -2199,39 +2119,13 @@ async function cargarMisPendientesFirma() {
 }
 
 async function cancelarMiPendienteFirma(id) {
-  const motivo = window.prompt(
-    `Indique el motivo de cancelación del documento ${id}. Este dato quedará registrado en la trazabilidad:`
-  );
-  if (motivo === null) return;
-  const motivoLimpio = motivo.trim();
-  if (motivoLimpio.length < 8) {
-    alert("Ingrese un motivo de cancelación de al menos 8 caracteres.");
-    return;
-  }
   if (!confirm(
-    `¿Confirmar la cancelación de ${id}?\n\nEl registro no será borrado: quedará marcado como cancelado para conservar la trazabilidad.`
+    `¿Cancelar el documento ${id}?\n\nYa no aparecerá en la bandeja de Mesa de Partes. Si lo necesita, deberá volver a generarlo desde "Certificar Documento".`
   )) return;
 
   try {
-    const refPendiente = doc(db, "pendientesFirma", id);
-    const snap = await getDoc(refPendiente);
-    if (!snap.exists()) throw new Error("El pendiente ya no existe.");
-    const actual = snap.data();
-    if (actual.certificadorUid !== usuarioActual.uid || actual.estado !== "pendiente-firma") {
-      throw new Error("El documento ya no puede ser cancelado por este usuario.");
-    }
-    const batch = writeBatch(db);
-    batch.set(refPendiente, {
-      estado: "cancelado-certificador",
-      motivoCancelacion: motivoLimpio,
-      canceladoPorUid: usuarioActual.uid,
-      canceladoPorNombre: perfilActual?.nombre || usuarioActual.email || "Certificador",
-      canceladoEn: serverTimestamp(),
-      versionSistema: APP_VERSION
-    }, { merge: true });
-    batch.set(crearRefAuditoria(), eventoAuditoria("PENDIENTE_CANCELADO", "pendientesFirma", id, { motivo: motivoLimpio, archivo: actual.archivoProvisionalNombre || actual.archivoOriginal || "" }));
-    await batch.commit();
-    mostrarEstado(`✓ Documento ${id} cancelado y conservado en la trazabilidad.`, "ok");
+    await deleteDoc(doc(db, "pendientesFirma", id));
+    mostrarEstado(`✓ Documento ${id} cancelado. Ya no está disponible para Mesa de Partes.`, "ok");
     await cargarMisPendientesFirma();
   } catch (err) {
     console.error(err);
@@ -2239,6 +2133,9 @@ async function cancelarMiPendienteFirma(id) {
   }
 }
 
+// Documentos que Mesa de Partes ya firmó y registró (últimos primero).
+// Es un acceso rápido directamente en el módulo de firma; el historial
+// completo de TODAS las certificaciones sigue disponible en "Historial".
 const MIS_FIRMADOS_LIMITE = 15;
 
 async function cargarMisDocumentosFirmados() {
@@ -2398,7 +2295,11 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
   try {
     const bytesFirmados = new Uint8Array(await pdfFirmadoSeleccionado.arrayBuffer());
 
-    const validacionFirma = await validarPdfFirmado(bytesFirmados, pendienteFirmaActual);
+    try {
+      await PDFLib.PDFDocument.load(bytesFirmados.slice());
+    } catch (e) {
+      throw new Error("El archivo seleccionado no es un PDF válido o está dañado.");
+    }
 
     const identidadEsperada = pendienteFirmaActual.id;
     let identidadConservada = false;
@@ -2422,7 +2323,8 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
       );
     }
 
-    const sha256Final = validacionFirma.sha256Final;
+    // El SHA-256 definitivo se calcula SOLO después de la firma digital.
+    const sha256Final = await calcularSHA256(bytesFirmados.slice());
     const nombreFinal = nombreConSufijo(pendienteFirmaActual.archivoOriginal);
 
     let handleDestino = null;
@@ -2473,37 +2375,21 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
       selloArchivo: pendienteFirmaActual.selloArchivo || "",
       firmaDigital: true,
       firmaDigitalTipo: "FIRMA ONPE",
-      validacionFirmaEstructural: true,
-      firmaSubFilter: validacionFirma.subFiltro,
-      firmaByteRange: validacionFirma.byteRange,
-      firmasDetectadas: validacionFirma.firmasDetectadas,
-      paginasPdfFirmado: validacionFirma.paginasEncontradas,
-      hashDiferentePreFirma: true,
       firmadoEnSAMICERT: serverTimestamp(),
       creadoEn: serverTimestamp(),
-      version: 30,
-      versionSistema: APP_VERSION,
+      version: 14,
       estado: "certificado"
     };
 
-    const batchFinal = writeBatch(db);
-    batchFinal.set(doc(db, "certificaciones", pendienteFirmaActual.id), registro);
-    batchFinal.set(doc(db, "certificacionesPublicas", pendienteFirmaActual.id), datosPublicosCertificacion(registro));
-    batchFinal.set(crearRefAuditoria(), eventoAuditoria("CERTIFICACION_FINAL_REGISTRADA", "certificaciones", pendienteFirmaActual.id, {
-      archivo: nombreFinal,
-      sha256Final,
-      firmaSubFilter: validacionFirma.subFiltro,
-      paginasPdfFirmado: validacionFirma.paginasEncontradas
-    }));
-    batchFinal.delete(doc(db, "pendientesFirma", pendienteFirmaActual.id));
-    await batchFinal.commit();
+    await setDoc(doc(db, "certificaciones", pendienteFirmaActual.id), registro);
 
-    if (pendienteFirmaActual.pdfChunksTotal) {
-      try {
-        await eliminarPdfPendiente(pendienteFirmaActual.id, pendienteFirmaActual.pdfChunksTotal);
-      } catch (cleanupError) {
-        console.warn("No se pudieron limpiar chunks históricos del pendiente:", cleanupError);
-      }
+    // Una vez creada la certificación definitiva, se elimina el PDF provisional
+    // y su registro de la bandeja para evitar duplicidad de archivos.
+    try {
+      await eliminarPdfPendiente(pendienteFirmaActual.id, pendienteFirmaActual.pdfChunksTotal || 0);
+      await deleteDoc(doc(db, "pendientesFirma", pendienteFirmaActual.id));
+    } catch (cleanupError) {
+      console.warn("La certificación quedó registrada, pero no se pudo limpiar el pendiente:", cleanupError);
     }
 
     const resultadoFinal = {
@@ -2724,41 +2610,25 @@ async function cargarHistorialEtapasAdmin() {
 }
 
 async function gestionarRegistroVB(id, accion) {
-  if (!esUsuarioVistoBueno() || !usuarioActual) {
-    mostrarEstadoVB("Solo el usuario de Visto Bueno puede realizar esta acción.", "error");
-    return;
-  }
-  const motivo = window.prompt("Indique el motivo de la cancelación. Quedará registrado en la trazabilidad:");
-  if (motivo === null) return;
-  const motivoLimpio = motivo.trim();
-  if (motivoLimpio.length < 8) {
-    mostrarEstadoVB("Ingrese un motivo de cancelación de al menos 8 caracteres.", "error");
-    return;
-  }
-  if (!confirm("¿Confirmar la cancelación de este documento con Visto Bueno? El registro se conservará como cancelado.")) return;
+  if (!esUsuarioVistoBueno()) return;
+  if (!esUsuarioVistoBueno() || !usuarioActual) { mostrarEstadoVB("Solo el usuario de Visto Bueno puede realizar esta acción.","error"); return; }
+  const mensaje = "¿Cancelar / eliminar este documento con Visto Bueno?\n\nEl registro dejará de aparecer en esta bandeja y en la bandeja del certificador. El PDF guardado no será eliminado.";
+  if (!confirm(mensaje)) return;
   try {
-    const ref = doc(db, "documentosVB", id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) throw new Error("El registro ya no existe.");
-    const actual = snap.data();
-    if (actual.estado !== "pendiente-certificador") throw new Error("El documento ya no se encuentra pendiente.");
-    const batch = writeBatch(db);
-    batch.set(ref, {
+    const ref = doc(db,"documentosVB",id);
+    // No borramos físicamente el documento de Firestore. Lo marcamos como
+    // cancelado para conservar la trazabilidad y evitar depender de permisos
+    // de delete en registros antiguos. La bandeja solo muestra pendientes.
+    await setDoc(ref,{
       estado:"cancelado",
-      motivoCancelacion:motivoLimpio,
       canceladoPor:usuarioActual.uid,
-      canceladoNombre:perfilActual?.nombre || "Raúl Rodríguez Calderón",
-      canceladoEmail:usuarioActual.email || VISTO_BUENO_EMAIL,
-      canceladoEn:serverTimestamp(),
-      versionSistema:APP_VERSION
-    }, { merge:true });
-    batch.set(crearRefAuditoria(), eventoAuditoria("VISTO_BUENO_CANCELADO", "documentosVB", id, { motivo:motivoLimpio, archivo:actual.archivoVBNombre || actual.archivoOriginal || "" }));
-    await batch.commit();
+      canceladoNombre:"Raúl Rodríguez Calderón",
+      canceladoEmail:VISTO_BUENO_EMAIL,
+      canceladoEn:serverTimestamp()
+    }, {merge:true});
     await cargarBandejaVB();
-    mostrarEstadoVB("Documento cancelado y conservado en la trazabilidad.");
-  } catch(e) {
-    mostrarEstadoVB("No se pudo actualizar el registro: " + (e.message || ""), "error");
-  }
+    mostrarEstadoVB("Documento cancelado/eliminado; el PDF no fue borrado.");
+  } catch(e) { mostrarEstadoVB("No se pudo actualizar el registro: "+(e.message||""),"error"); }
 }
 
 async function cargarBandejaVB() {
@@ -2793,7 +2663,7 @@ async function cargarBandejaVB() {
             </div>
           </div>
           ${esUsuarioVistoBueno() ? `<div class="firma-pendiente-actions">
-            <button type="button" class="btn-danger btn-small btn-vb-cancelar-eliminar" data-id="${escapeHtml(r.id)}">Cancelar envío</button>
+            <button type="button" class="btn-danger btn-small btn-vb-cancelar-eliminar" data-id="${escapeHtml(r.id)}">Cancelar / eliminar</button>
           </div>` : `<span class="vb-estado-sutil">${escapeHtml(r.estado || "Con VB")}</span>`}
         </div>`).join("") : '<div class="empty">No hay documentos con Visto Bueno registrados.</div>';
 
@@ -2805,6 +2675,10 @@ async function cargarBandejaVB() {
 }
 
 function claveCertificacionHistorial(r) {
+  // Una certificación definitiva se identifica primero por su huella final.
+  // Si registros antiguos no tienen SHA-256, se usan los metadatos que
+  // identifican la misma operación. Esto evita mostrar dos veces el mismo
+  // registro sin ocultar recertificaciones reales.
   const shaFinal = String(r.sha256 || "").trim().toLowerCase();
   if (shaFinal) return `sha256:${shaFinal}`;
   const certificacionId = String(r.certificacionId || "").trim();
@@ -2986,6 +2860,9 @@ function actualizarAccesoAdministrador() {
   const navFirmar = $("navFirmar");
   const navVerificar = document.querySelector('.nav-btn[data-page="verificar"]');
 
+  // Mesa de Partes: no certifica ni verifica desde el menú (solo firma/remite
+  // e historial), pero sí tiene Inicio, Acerca de y Cambio de contraseña,
+  // igual que los certificadores.
   if (navCertificar) navCertificar.classList.toggle("oculto", esMesa || esVB);
   if (navVerificar) navVerificar.classList.toggle("oculto", esMesa || esVB);
   if (navFirmar) navFirmar.classList.toggle("oculto", !esMesa);
@@ -2993,6 +2870,9 @@ function actualizarAccesoAdministrador() {
   document.querySelector('.nav-btn[data-page="acerca"]')?.classList.remove("oculto");
   if (btnCambiarPassword) btnCambiarPassword.classList.remove("oculto");
 
+  // Accesos directos de la página de Inicio: para Mesa de Partes solo se
+  // muestran los que corresponden a su rol (Firmar y remitir, Historial,
+  // Acerca de); Certificar y Verificar quedan ocultos.
   const cardCertificar = $("cardInicioCertificar");
   const cardVerificar = $("cardInicioVerificar");
   const cardFirmar = $("cardInicioFirmar");
@@ -3042,6 +2922,10 @@ async function cargarAdministracion() {
   estado.textContent = "";
 
   try {
+    // Administración muestra únicamente las certificaciones definitivas,
+    // sin mezclar los registros de VB ni los pendientes del certificador.
+    // Se deduplican antes de mostrarlas para que una certificación registrada
+    // una sola vez no aparezca repetida en esta bandeja.
     const snap = await getDocs(collection(db, "certificaciones"));
     const registros = deduplicarHistorialCertificaciones(
       snap.docs.map(d => ({...d.data(), id:d.id, coleccion:"certificaciones"}))
@@ -3054,6 +2938,7 @@ async function cargarAdministracion() {
       return;
     }
 
+    // Separar por certificador evita mezclar registros de distintos usuarios.
     const grupos = new Map();
     for (const r of registros) {
       const usuario = r.certificadorNombre || r.certificadorEmail || r.firmanteNombre || r.firmanteEmail || "No indicado";
@@ -3120,89 +3005,20 @@ function seleccionarTodosAdmin(valor) {
   actualizarBotonEliminarAdmin();
 }
 
-function formatearFechaAuditoria(r) {
-  const ts = r.creadoEn?.seconds ? new Date(r.creadoEn.seconds * 1000) : null;
-  if (!ts) return "Fecha no disponible";
-  return new Intl.DateTimeFormat("es-PE", { timeZone:"America/Lima", dateStyle:"short", timeStyle:"medium" }).format(ts);
-}
-
-async function cargarAuditoriaAdmin() {
-  if (!esAdministradorActual) return;
-  const contenedor = $("auditoriaLista");
-  if (!contenedor) return;
-  contenedor.innerHTML = '<div class="empty">Cargando bitácora…</div>';
-  try {
-    const snap = await getDocs(collection(db, "auditoria"));
-    const registros = snap.docs
-      .map(d => ({ ...d.data(), id:d.id }))
-      .sort((a,b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0))
-      .slice(0, 100);
-    if (!registros.length) {
-      contenedor.innerHTML = '<div class="empty">Aún no hay eventos de auditoría registrados.</div>';
-      return;
-    }
-    contenedor.innerHTML = registros.map(r => {
-      const detalle = r.detalle && typeof r.detalle === "object"
-        ? Object.entries(r.detalle).map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : String(v ?? "")}`).join(" · ")
-        : "";
-      return `<div class="audit-item">
-        <div><div class="audit-type">${escapeHtml(r.tipo || "EVENTO")}</div><div class="history-meta">${escapeHtml(r.actorNombre || r.actorEmail || "Usuario")}</div></div>
-        <div class="audit-detail"><strong>${escapeHtml(r.entidad || "")}</strong> · ${escapeHtml(r.entidadId || "")}${detalle ? `<br>${escapeHtml(detalle)}` : ""}</div>
-        <div class="audit-date">${escapeHtml(formatearFechaAuditoria(r))}</div>
-      </div>`;
-    }).join("");
-  } catch (err) {
-    console.error(err);
-    contenedor.innerHTML = `<div class="empty">No se pudo cargar la bitácora: ${escapeHtml(err.message || "")}</div>`;
-  }
-}
-
-async function sincronizarCertificacionesPublicas() {
-  if (!esAdministradorActual) return;
-  const estado = $("syncPublicaStatus");
-  const btn = $("btnSincronizarPublicas");
-  if (btn) btn.disabled = true;
-  if (estado) estado.textContent = "Sincronizando…";
-  try {
-    const snap = await getDocs(collection(db, "certificaciones"));
-    const docs = snap.docs;
-    let procesados = 0;
-    for (let i = 0; i < docs.length; i += 350) {
-      const loteDocs = docs.slice(i, i + 350);
-      const batch = writeBatch(db);
-      for (const d of loteDocs) {
-        const r = { ...d.data(), id:d.id };
-        batch.set(doc(db, "certificacionesPublicas", d.id), datosPublicosCertificacion(r), { merge:true });
-      }
-      await batch.commit();
-      procesados += loteDocs.length;
-      if (estado) estado.textContent = `Sincronizadas ${procesados} de ${docs.length}…`;
-    }
-    await registrarAuditoria("INDICE_PUBLICO_SINCRONIZADO", "certificacionesPublicas", "historico", { total:docs.length });
-    if (estado) estado.textContent = `Consulta pública sincronizada: ${docs.length} certificación(es).`;
-    await cargarAuditoriaAdmin();
-  } catch (err) {
-    console.error(err);
-    if (estado) estado.textContent = `No se pudo sincronizar: ${err.message || ""}`;
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
 async function crearBackupAdmin() {
   if (!esAdministradorActual) return;
   const estado = $("backupStatus");
   estado.textContent = "Generando respaldo…";
 
   try {
-    const coleccionesBackup = ["documentosVB","pendientesFirma","certificaciones","certificacionesPublicas","auditoria","archivoEliminados"];
+    const coleccionesBackup = ["documentosVB","pendientesFirma","certificaciones"];
     const snaps = await Promise.all(coleccionesBackup.map(nombre => getDocs(collection(db,nombre))));
     const registros = snaps.flatMap((snap,i) =>
       snap.docs.map(d => ({...d.data(), id:d.id, coleccion:coleccionesBackup[i]}))
     );
     const backup = {
       sistema: "SAMICERT",
-      version: APP_VERSION,
+      version: "2.8.0",
       creadoPor: "Alfredo Raúl Cruzado Palacios",
       tipo: "respaldo_registros_firestore",
       generadoEn: new Date().toISOString(),
@@ -3231,61 +3047,42 @@ async function eliminarSeleccionadosAdmin() {
   if (!esAdministradorActual) return;
   const ids = obtenerSeleccionAdmin();
   if (!ids.length) return;
-  const motivo = ($("adminMotivoEliminacion")?.value || "").trim();
-  if (motivo.length < 10) {
-    alert("Ingrese un motivo de retiro de al menos 10 caracteres.");
-    $("adminMotivoEliminacion")?.focus();
-    return;
-  }
+
   const confirmado = confirm(
-    `Está a punto de archivar y retirar ${ids.length} registro(s).\n\nLa copia íntegra y el evento de auditoría quedarán conservados. ¿Desea continuar?`
+    `Está a punto de eliminar ${ids.length} registro(s) seleccionado(s) de la etapa y usuario que aparecen en la bandeja.\n\n` +
+    `Esta acción es irreversible desde SAMICERT. ¿Desea continuar?`
   );
   if (!confirmado) return;
 
   const estado = $("adminStatus");
-  estado.textContent = "Archivando y retirando…";
+  estado.textContent = "Eliminando…";
   const btn = $("btnEliminarSeleccionados");
   btn.disabled = true;
 
-  let completados = 0;
   try {
     for (const seleccionado of ids) {
       const [coleccion, id] = seleccionado.includes("|") ? seleccionado.split("|") : ["certificaciones", seleccionado];
       if (!["documentosVB","pendientesFirma","certificaciones"].includes(coleccion)) continue;
-      const ref = doc(db, coleccion, id);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) continue;
-      const original = snap.data();
-      const chunksSnap = await getDocs(collection(db, coleccion, id, "pdfChunks"));
-      const batch = writeBatch(db);
-      const archivoId = `${coleccion}__${id}__${Date.now()}`;
-      batch.set(doc(db, "archivoEliminados", archivoId), {
-        coleccionOrigen: coleccion,
-        idOrigen: id,
-        registroOriginal: original,
-        motivo,
-        retiradoPorUid: usuarioActual.uid,
-        retiradoPorNombre: perfilActual?.nombre || usuarioActual.email || "Administrador",
-        retiradoPorEmail: usuarioActual.email || "",
-        retiradoEn: serverTimestamp(),
-        versionSistema: APP_VERSION
-      });
-      batch.set(crearRefAuditoria(), eventoAuditoria("REGISTRO_ARCHIVADO_Y_RETIRADO", coleccion, id, { motivo, archivo: archivoAdmin({ ...original, coleccion }) }));
-      for (const chunkDoc of chunksSnap.docs) batch.delete(chunkDoc.ref);
-      if (coleccion === "certificaciones") batch.delete(doc(db, "certificacionesPublicas", id));
-      batch.delete(ref);
-      await batch.commit();
-      completados++;
-      estado.textContent = `Procesados ${completados} de ${ids.length}…`;
+      // Primero se eliminan los trozos del PDF archivado en Firestore (si
+      // existen), y luego el registro principal. SAMICERT no usa Firebase
+      // Storage: el PDF firmado también se conserva localmente o en la ruta
+      // institucional definida por la entidad.
+      try {
+        const chunksSnap = await getDocs(collection(db, coleccion, id, "pdfChunks"));
+        for (const chunkDoc of chunksSnap.docs) {
+          await deleteDoc(chunkDoc.ref);
+        }
+      } catch (chunkErr) {
+        console.error(`No se pudieron eliminar los trozos de PDF de ${id}:`, chunkErr);
+      }
+      await deleteDoc(doc(db,coleccion,id));
     }
-    estado.textContent = `Se archivaron y retiraron ${completados} registro(s) con trazabilidad.`;
-    if ($("adminMotivoEliminacion")) $("adminMotivoEliminacion").value = "";
+    estado.textContent = `Se eliminaron ${ids.length} registro(s), incluyendo su PDF archivado cuando existía.`;
     await cargarAdministracion();
     await cargarHistorial();
-    await cargarAuditoriaAdmin();
   } catch (err) {
     console.error(err);
-    estado.textContent = `No se pudo completar la operación: ${err.message || ""}`;
+    estado.textContent = `No se pudo completar la eliminación: ${err.message || ""}`;
     await cargarAdministracion();
   }
 }
@@ -3302,7 +3099,7 @@ function mostrarPagina(nombre) {
 
   if (nombre === "historial") cargarHistorial();
   if (nombre === "detalleUsuarios") cargarHistorialEtapasAdmin();
-  if (nombre === "administracion") { cargarAdministracion(); cargarAuditoriaAdmin(); }
+  if (nombre === "administracion") cargarAdministracion();
   if (nombre === "vistoBueno") {
     cargarSelloVistoBueno().then(() => cargarBandejaVB()).catch(err => {
       mostrarEstadoVB(err.message || "No se pudo cargar el sello de Visto Bueno.", "error");
@@ -3324,6 +3121,7 @@ function mostrarPagina(nombre) {
 }
 
 
+// Menú lateral móvil estilo SAAMIR
 const btnMenuMovil = $("btnMenuMovil");
 const sidebarMovil = document.querySelector(".sidebar");
 const sidebarBackdrop = $("sidebarBackdrop");
@@ -3374,8 +3172,6 @@ document.querySelectorAll("[data-go]").forEach(btn => {
 $("btnActualizarHistorial").addEventListener("click", cargarHistorial);
 
 $("btnCrearBackup").addEventListener("click", crearBackupAdmin);
-$("btnSincronizarPublicas")?.addEventListener("click", sincronizarCertificacionesPublicas);
-$("btnActualizarAuditoria")?.addEventListener("click", cargarAuditoriaAdmin);
 $("btnEliminarSeleccionados").addEventListener("click", eliminarSeleccionadosAdmin);
 $("btnSeleccionarTodosAdmin").addEventListener("click", () => seleccionarTodosAdmin(true));
 $("btnDeseleccionarTodosAdmin").addEventListener("click", () => seleccionarTodosAdmin(false));
@@ -3418,6 +3214,9 @@ async function cargarPerfil(user) {
       rol:esAdmin ? "administrador" : (esMesa ? "mesa_partes" : (esVB ? "visto_bueno" : (snap.data().rol || "certificador")))
     };
 
+    // Autocorrección de nombres de perfiles antiguos.
+    // Raúl debe mostrarse siempre con su nombre completo, incluso si su
+    // documento usuarios/{uid} todavía conserva el nombre corto "Raúl".
     if (esVB && perfilActual.nombre !== "Raúl Rodríguez Calderón") {
       perfilActual.nombre = "Raúl Rodríguez Calderón";
       try {
@@ -3427,6 +3226,8 @@ async function cargarPerfil(user) {
       }
     }
 
+    // Autocorrección: cuentas antiguas de Mesa de Partes que quedaron
+    // guardadas con el nombre por defecto "Administrador".
     if (esMesa && (!perfilActual.nombre || perfilActual.nombre === "Administrador")) {
       perfilActual.nombre = "Mesa de Partes";
       try {

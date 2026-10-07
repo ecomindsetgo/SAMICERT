@@ -73,7 +73,10 @@ label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:7
 }
 
 
-
+/* =========================================================
+   SAMICERT VERIFICACIÓN — RESPONSIVE / MÓVILES
+   Solo presentación. No modifica verificar.js.
+   ========================================================= */
 
 @media (max-width: 700px) {
   html { -webkit-text-size-adjust:100%; }

@@ -77,7 +77,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      SAMICERT v3.0.0<br>
+      SAMICERT v2.8.0<br>
       Creado por Alfredo Raúl Cruzado Palacios<br>
       © 2026 Poder Judicial del Perú
     </div>
@@ -286,7 +286,7 @@
           <div id="panelFirma" class="firma-panel oculto">
             <div class="panel-title">Documento entregado a Mesa de Partes</div>
             <div class="panel-subtitle">
-              El PDF provisional fue guardado en la carpeta compartida y su registro quedó disponible en la bandeja de <strong>Mesa de Partes</strong>.
+              El PDF provisional fue almacenado en SAMICERT y quedó disponible en la bandeja de <strong>Mesa de Partes</strong>.
               La firma digital, el SHA-256 definitivo y el registro final se realizan desde la cuenta de Mesa de Partes.
             </div>
             <div class="firma-pasos">
@@ -336,17 +336,13 @@
             <span>1. Ubicar [SF] en carpeta compartida</span><span>→</span><span>2. Firmar con Firma ONPE</span><span>→</span><span>3. Cargar PDF firmado</span><span>→</span><span>4. Calcular SHA-256 y registrar</span>
           </div>
 
-          <div class="firma-validacion-info">
-            <strong>Validación reforzada:</strong> antes del registro, SAMICERT comprobará identidad de la carátula, número de páginas, huella distinta al [SF], ByteRange, contenedor de firma y SubFilter PKCS#7/CAdES. Esta comprobación estructural no reemplaza la validación de confianza del certificado digital realizada por el software oficial de firma.
-          </div>
-
           <div class="verify-upload firma-upload">
             <input type="file" id="inputPdfFirmado" accept="application/pdf,.pdf">
             <div id="archivoPdfFirmadoNombre" class="verify-file-name oculto"></div>
           </div>
 
           <div class="actions firma-actions">
-            <button type="button" class="btn-green" id="btnRegistrarFirmado" disabled>Validar firma y registrar</button>
+            <button type="button" class="btn-green" id="btnRegistrarFirmado" disabled>Firmar, calcular SHA y registrar</button>
             <button type="button" class="btn-gray" id="btnCancelarFirmaMesa">Cancelar</button>
           </div>
         </div>
@@ -484,34 +480,17 @@
         </div>
 
         <div class="panel">
-          <div class="panel-title">Consulta pública y trazabilidad</div>
+          <div class="panel-title admin-danger">Limpieza de datos de prueba</div>
           <div class="panel-subtitle">
-            Sincroniza las certificaciones históricas con el índice público mínimo usado por los códigos QR y permite revisar la bitácora de acciones críticas.
-          </div>
-          <div class="admin-toolbar">
-            <button class="btn-green" id="btnSincronizarPublicas">Sincronizar consulta pública</button>
-            <button class="btn-small" id="btnActualizarAuditoria">Actualizar bitácora</button>
-            <span class="admin-status" id="syncPublicaStatus"></span>
-          </div>
-          <div id="auditoriaLista" class="audit-list"><div class="empty">La bitácora se cargará al abrir Administración.</div></div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-title admin-danger">Archivo controlado de registros de prueba o error</div>
-          <div class="panel-subtitle">
-            Seleccione únicamente registros que correspondan a pruebas o errores. Antes de retirarlos del registro operativo, SAMICERT conservará una copia íntegra en el archivo administrativo y registrará la acción en la bitácora.
+            Seleccione registros que correspondan a pruebas o errores y elimínelos. Esta operación es irreversible desde la aplicación.
           </div>
           <div class="admin-note">
-            <strong>Control de trazabilidad:</strong> el motivo es obligatorio. La copia archivada y el evento de auditoría no pueden editarse ni borrarse desde la aplicación.
-          </div>
-          <div class="field admin-reason-field">
-            <label for="adminMotivoEliminacion">Motivo del retiro</label>
-            <textarea id="adminMotivoEliminacion" rows="3" minlength="10" placeholder="Ejemplo: registro generado durante pruebas de implementación, sin valor documental."></textarea>
+            <strong>Recomendación:</strong> genere un respaldo antes de eliminar información. Las reglas de Firebase impiden que los certificadores eliminen registros.
           </div>
           <div class="admin-toolbar">
             <button class="btn-small" id="btnSeleccionarTodosAdmin">Seleccionar todos</button>
             <button class="btn-small" id="btnDeseleccionarTodosAdmin">Deseleccionar todos</button>
-            <button class="btn-danger" id="btnEliminarSeleccionados" disabled>Archivar y retirar seleccionados</button>
+            <button class="btn-danger" id="btnEliminarSeleccionados" disabled>Eliminar seleccionados</button>
             <span class="admin-status" id="adminStatus"></span>
           </div>
           <div id="adminLista" class="history-list">
