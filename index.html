@@ -300,8 +300,11 @@
           <div class="panel-title">Mis documentos enviados a Mesa de Partes (pendientes de firma)</div>
           <div class="panel-subtitle">
             Si envió un documento por error, puede cancelarlo aquí mientras siga "pendiente de firma".
-            Una vez que Mesa de Partes lo firma y registra, ya no aparece en esta lista.
+            El envío se retira de ambas bandejas y conserva su trazabilidad. El PDF guardado en la carpeta compartida no se borra automáticamente.
+            Una vez que Mesa de Partes registra la certificación, ya no puede cancelarlo aquí.
           </div>
+          <div class="actions"><button type="button" class="btn-gray btn-small" id="btnActualizarMisPendientes">Actualizar enviados</button></div>
+          <div id="misPendientesEstado" role="status" aria-live="polite"></div>
           <div id="misPendientesLista" class="firma-pendientes-lista">
             <div class="empty">Cargando…</div>
           </div>
@@ -322,6 +325,7 @@
             Ubique el PDF [SF] en la carpeta compartida (el nombre exacto se muestra en cada documento), fírmelo digitalmente con Firma ONPE y luego haga clic en "Firmar y registrar" para cargar el PDF ya firmado.
             El SHA-256 definitivo se calcula sobre el PDF ya firmado.
           </div>
+          <div class="actions"><button type="button" class="btn-gray btn-small" id="btnActualizarPendientesMesa">Actualizar pendientes</button></div>
           <div id="pendientesFirmaLista" class="firma-pendientes-lista">
             <div class="empty">Cargando documentos pendientes…</div>
           </div>
@@ -634,6 +638,6 @@
   </div>
 </div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=20261007-cancelacion"></script>
 </body>
 </html>

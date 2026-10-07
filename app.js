@@ -4,7 +4,7 @@ import {
   EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, limit, getDocs, serverTimestamp
+  getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, limit, getDocs, serverTimestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 import { firebaseConfig, ADMIN_UID } from "./firebase-config.js";
 
@@ -2068,9 +2068,52 @@ let pendienteFirmaActual = null;
 // Permite al certificador ver los documentos que ÉL envió a Mesa de Partes
 // y que siguen "pendiente-firma", y cancelarlos si se equivocó de archivo
 // (por ejemplo, si generó el [SF] de un PDF que no correspondía).
+function esMiEnvioPendiente(registro, usuario = usuarioActual) {
+  if (!usuario || !obtenerUsuarioAutorizado(usuario)) return false;
+  return registro.certificadorUid === usuario.uid;
+}
+
+async function cancelarEnvioPendiente(id, usuario) {
+  if (!usuario || !obtenerUsuarioAutorizado(usuario)) {
+    throw new Error("Inicie sesión con la cuenta del certificador que envió el documento.");
+  }
+  const referencia = doc(db, "pendientesFirma", id);
+  await runTransaction(db, async transaccion => {
+    const pendiente = await transaccion.get(referencia);
+    const certificacion = await transaccion.get(doc(db, "certificaciones", id));
+    if (certificacion.exists()) throw new Error("Mesa de Partes ya registró esta certificación. No se puede cancelar el envío.");
+    if (!pendiente.exists()) throw new Error("El envío ya no está disponible. Actualice la bandeja.");
+    const registro = pendiente.data();
+    if (!esMiEnvioPendiente(registro, usuario)) throw new Error("Solo puede cancelar los documentos enviados por su propia cuenta.");
+    if (registro.estado !== "pendiente-firma") throw new Error("El documento ya no está pendiente de firma. Actualice la bandeja.");
+    transaccion.update(referencia, {
+      estado: "cancelado-certificador",
+      canceladoPorUid: usuario.uid,
+      canceladoNombre: perfilActual?.nombre || usuario.displayName || usuario.email || "Certificador",
+      canceladoEmail: usuario.email || "",
+      canceladoEn: serverTimestamp()
+    });
+  });
+}
+
+async function registrarCertificacionVigente(id, registro) {
+  await runTransaction(db, async transaccion => {
+    const pendiente = await transaccion.get(doc(db, "pendientesFirma", id));
+    const certificacion = await transaccion.get(doc(db, "certificaciones", id));
+    if (certificacion.exists()) throw new Error("Esta certificación ya fue registrada.");
+    if (!pendiente.exists() || pendiente.data().estado !== "pendiente-firma") {
+      throw new Error("El envío fue cancelado o ya no está disponible. No se registró la certificación.");
+    }
+    if (pendiente.data().certificadorUid !== registro.certificadorUid) {
+      throw new Error("Los datos del envío cambiaron. Abra nuevamente el documento desde la bandeja.");
+    }
+    transaccion.set(doc(db, "certificaciones", id), registro);
+  });
+}
+
 async function cargarMisPendientesFirma() {
   cargarBandejaVB();
-  if (!usuarioActual || esUsuarioMesaPartes()) return;
+  if (!usuarioActual || !obtenerUsuarioAutorizado(usuarioActual)) return;
   const contenedor = $("misPendientesLista");
   if (!contenedor) return;
 
@@ -2080,7 +2123,7 @@ async function cargarMisPendientesFirma() {
     const snap = await getDocs(collection(db, "pendientesFirma"));
     const pendientes = snap.docs
       .map(d => ({...d.data(), id:d.id}))
-      .filter(r => r.estado === "pendiente-firma" && r.certificadorUid === usuarioActual.uid)
+      .filter(r => r.estado === "pendiente-firma" && esMiEnvioPendiente(r))
       .sort((a,b) => fechaRegistroEnMs(b) - fechaRegistroEnMs(a));
 
     if (!pendientes.length) {
@@ -2110,7 +2153,7 @@ async function cargarMisPendientesFirma() {
     `).join("");
 
     contenedor.querySelectorAll(".btn-cancelar-pendiente").forEach(btn => {
-      btn.addEventListener("click", () => cancelarMiPendienteFirma(btn.dataset.id));
+      btn.addEventListener("click", () => cancelarMiPendienteFirma(btn.dataset.id, btn));
     });
   } catch (err) {
     console.error(err);
@@ -2118,20 +2161,34 @@ async function cargarMisPendientesFirma() {
   }
 }
 
-async function cancelarMiPendienteFirma(id) {
+async function cancelarMiPendienteFirma(id, boton) {
+  if (boton?.disabled) return;
   if (!confirm(
-    `¿Cancelar el documento ${id}?\n\nYa no aparecerá en la bandeja de Mesa de Partes. Si lo necesita, deberá volver a generarlo desde "Certificar Documento".`
+    `¿Cancelar / eliminar el envío ${id}?\n\nSe retirará de las bandejas pendientes del certificador y de Mesa de Partes, conservando el registro de cancelación. El PDF [SF] de la carpeta compartida no se borra automáticamente. Si necesita enviarlo otra vez, genere un nuevo documento.`
   )) return;
 
+  const estado = $("misPendientesEstado");
+  if (boton) { boton.disabled = true; boton.textContent = "Cancelando…"; }
+  if (estado) estado.textContent = "Cancelando envío…";
   try {
-    await deleteDoc(doc(db, "pendientesFirma", id));
-    mostrarEstado(`✓ Documento ${id} cancelado. Ya no está disponible para Mesa de Partes.`, "ok");
+    await cancelarEnvioPendiente(id, usuarioActual);
+    if (procesoFirmaPendiente?.id === id) procesoFirmaPendiente = null;
+    if (estado) estado.textContent = `✓ Envío ${id} cancelado. Ya no está disponible para Mesa de Partes. El PDF de la carpeta compartida se conserva.`;
     await cargarMisPendientesFirma();
   } catch (err) {
     console.error(err);
-    alert("No se pudo cancelar el documento: " + (err.message || ""));
+    const detalle = String(err.code || "").includes("permission-denied")
+      ? "Firebase rechazó la operación. Compruebe que ingresó con la cuenta que realizó el envío y que están publicadas las reglas incluidas en esta actualización."
+      : (err.message || "Verifique su conexión e inténtelo nuevamente.");
+    if (estado) estado.textContent = "No se pudo cancelar el envío: " + detalle;
+    else alert("No se pudo cancelar el envío: " + detalle);
+  } finally {
+    if (boton) { boton.disabled = false; boton.textContent = "Cancelar / eliminar"; }
   }
 }
+
+$("btnActualizarMisPendientes")?.addEventListener("click", cargarMisPendientesFirma);
+$("btnActualizarPendientesMesa")?.addEventListener("click", cargarPendientesFirma);
 
 // Documentos que Mesa de Partes ya firmó y registró (últimos primero).
 // Es un acceso rápido directamente en el módulo de firma; el historial
@@ -2293,6 +2350,10 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
 
   btnRegistrarFirmado.disabled = true;
   try {
+    const envioVigente = await getDoc(doc(db, "pendientesFirma", pendienteFirmaActual.id));
+    if (!envioVigente.exists() || envioVigente.data().estado !== "pendiente-firma") {
+      throw new Error("El envío fue cancelado o ya no está disponible. Actualice la bandeja de Mesa de Partes.");
+    }
     const bytesFirmados = new Uint8Array(await pdfFirmadoSeleccionado.arrayBuffer());
 
     try {
@@ -2381,7 +2442,7 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
       estado: "certificado"
     };
 
-    await setDoc(doc(db, "certificaciones", pendienteFirmaActual.id), registro);
+    await registrarCertificacionVigente(pendienteFirmaActual.id, registro);
 
     // Una vez creada la certificación definitiva, se elimina el PDF provisional
     // y su registro de la bandeja para evitar duplicidad de archivos.
