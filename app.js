@@ -1049,7 +1049,6 @@ async function guardarDocumentoVB() {
   btnAplicarVB.disabled = true;
   mostrarEstadoVB("Procesando el PDF y colocando el sello VB…");
   try {
-    const bytes = await aplicarVistoBuenoAUnPdf(archivoVBActual);
     const nombreSalidaVB = nombreConSufijoVB(archivoVBActual.name);
     let handleDestino = null;
 
@@ -1065,6 +1064,7 @@ async function guardarDocumentoVB() {
       }
     }
 
+    const bytes = await aplicarVistoBuenoAUnPdf(archivoVBActual);
     const resultado = await guardarResultado(bytes, nombreSalidaVB, handleDestino, null);
     // Registrar el ingreso en la bandeja compartida de certificación. El PDF sigue guardándose en la carpeta compartida local.
     const vbId = (crypto.randomUUID ? crypto.randomUUID() : `VB-${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
@@ -1922,6 +1922,21 @@ btnAplicar.addEventListener("click", async () => {
 
   let datosRecert = { continuar: true, motivo: "" };
   try {
+    let handleDestino = null;
+    if ("showSaveFilePicker" in window) {
+      try {
+        handleDestino = await window.showSaveFilePicker({
+          suggestedName: nombreProvisional,
+          types: [{ description: "Documento PDF", accept: { "application/pdf": [".pdf"] } }]
+        });
+      } catch (err) {
+        if (err.name === "AbortError") {
+          throw new Error("Se canceló la ubicación de guardado. El documento no fue entregado a Mesa de Partes.");
+        }
+        throw err;
+      }
+    }
+
     if (!hashOrigenActual) {
       hashOrigenActual = await calcularSHA256(await archivoSeleccionado.file.arrayBuffer());
     }
@@ -1960,21 +1975,6 @@ btnAplicar.addEventListener("click", async () => {
     const resultado = await aplicarSelloAUnPdf(archivoSeleccionado.file);
     const sha256PreFirma = await calcularSHA256(resultado.bytesSalida);
     const pendienteId = resultado.meta.id;
-
-    let handleDestino = null;
-    if ("showSaveFilePicker" in window) {
-      try {
-        handleDestino = await window.showSaveFilePicker({
-          suggestedName: nombreProvisional,
-          types: [{ description: "Documento PDF", accept: { "application/pdf": [".pdf"] } }]
-        });
-      } catch (err) {
-        if (err.name === "AbortError") {
-          throw new Error("Se canceló la ubicación de guardado. El documento no fue entregado a Mesa de Partes.");
-        }
-        throw err;
-      }
-    }
 
     const resultadoGuardado = await guardarResultado(
       resultado.bytesSalida, nombreProvisional, handleDestino, null
@@ -2380,6 +2380,22 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
 
   btnRegistrarFirmado.disabled = true;
   try {
+    const nombreFinal = nombreConSufijo(pendienteFirmaActual.archivoOriginal);
+    let handleDestino = null;
+    if ("showSaveFilePicker" in window) {
+      try {
+        handleDestino = await window.showSaveFilePicker({
+          suggestedName: nombreFinal,
+          types: [{description:"Documento PDF", accept:{"application/pdf":[".pdf"]}}]
+        });
+      } catch (err) {
+        if (err.name === "AbortError") {
+          throw new Error("Se canceló la ubicación de guardado. El proceso no se completó.");
+        }
+        throw err;
+      }
+    }
+
     const envioVigente = await getDoc(doc(db, "pendientesFirma", pendienteFirmaActual.id));
     if (!envioVigente.exists() || envioVigente.data().estado !== "pendiente-firma") {
       throw new Error("El envío fue cancelado o ya no está disponible. Actualice la bandeja de Mesa de Partes.");
@@ -2418,22 +2434,6 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
 
     // El SHA-256 definitivo se calcula SOLO después de la firma digital.
     const sha256Final = await calcularSHA256(bytesFirmados.slice());
-    const nombreFinal = nombreConSufijo(pendienteFirmaActual.archivoOriginal);
-
-    let handleDestino = null;
-    if ("showSaveFilePicker" in window) {
-      try {
-        handleDestino = await window.showSaveFilePicker({
-          suggestedName: nombreFinal,
-          types: [{description:"Documento PDF", accept:{"application/pdf":[".pdf"]}}]
-        });
-      } catch (err) {
-        if (err.name === "AbortError") {
-          throw new Error("Se canceló la ubicación de guardado. El proceso no se completó.");
-        }
-        throw err;
-      }
-    }
 
     const resultadoGuardado = await guardarResultado(
       bytesFirmados.slice(), nombreFinal, handleDestino, null
