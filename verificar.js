@@ -87,7 +87,7 @@ async function consultar(idCrudo) {
   $("cargando").classList.remove("oculto");
 
   try {
-    const snap = await getDoc(doc(db, "certificaciones", id));
+    const snap = await getDoc(doc(db, "certificacionesPublicas", id));
     $("cargando").classList.add("oculto");
     if (snap.exists()) {
       mostrarRegistro({ ...snap.data(), id: snap.data().id || snap.id });
@@ -131,9 +131,9 @@ $("inputPdf").addEventListener("change", async e => {
 
     if (hash === esperado) {
       caja.className = "aviso aviso-ok";
-      caja.innerHTML = "<strong>✓ El archivo es íntegro y auténtico</strong>" +
+      caja.innerHTML = "<strong>✓ El archivo coincide con el PDF registrado</strong>" +
         "Es exactamente el PDF que se certificó con el código " + escapeHtml(registroActual.id) +
-        ". No ha sido modificado desde entonces.";
+        ". No ha sido modificado desde entonces. Esta comparación no valida por sí sola el certificado digital del firmante ni su revocación.";
     } else {
       caja.className = "aviso aviso-error";
       caja.innerHTML = "<strong>✗ El archivo NO coincide con esta certificación</strong>" +

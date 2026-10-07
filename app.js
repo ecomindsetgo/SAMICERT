@@ -2096,6 +2096,35 @@ async function cancelarEnvioPendiente(id, usuario) {
   });
 }
 
+function validarFirmaEstructural(bytes) {
+  const texto = new TextDecoder("latin1").decode(bytes);
+  const patron = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g;
+  for (const match of texto.matchAll(patron)) {
+    const [inicio, longitud, segundoInicio, segundaLongitud] = match.slice(1).map(Number);
+    if (![inicio, longitud, segundoInicio, segundaLongitud].every(Number.isSafeInteger)) continue;
+    if (inicio !== 0 || longitud <= 0 || segundoInicio <= longitud || segundaLongitud <= 0) continue;
+    if (segundoInicio + segundaLongitud !== bytes.length) continue;
+    const hueco = texto.slice(longitud, segundoInicio);
+    const contenido = /^<([\da-fA-F\s]+)>$/.exec(hueco);
+    if (!contenido || !/[1-9a-fA-F]/.test(contenido[1])) continue;
+    if (!/\/Contents\s*$/.test(texto.slice(Math.max(0, longitud - 80), longitud))) continue;
+    return true;
+  }
+  throw new Error("El PDF no contiene una firma digital estructuralmente válida que cubra el archivo completo. Firme el archivo [SF] con Firma ONPE y seleccione el PDF resultante. Esta comprobación no valida el certificado del firmante ni su revocación.");
+}
+
+function crearRegistroPublico(registro) {
+  const campos = ["id", "fecha", "hora", "zonaHoraria", "archivoCertificadoNombre", "paginasCertificadas", "totalPaginas", "certificadorNombre", "firmanteNombre", "firmaDigital", "firmaDigitalTipo", "validacionFirmaEstructural", "esRecertificacion", "motivoRecertificacion", "certificacionesPrevias", "estado"];
+  const publico = {};
+  for (const campo of campos) {
+    if (registro[campo] !== undefined) publico[campo] = registro[campo];
+  }
+  publico.sha256 = registro.sha256Final;
+  publico.versionSistema = 15;
+  publico.publicadoEn = serverTimestamp();
+  return publico;
+}
+
 async function registrarCertificacionVigente(id, registro) {
   await runTransaction(db, async transaccion => {
     const pendiente = await transaccion.get(doc(db, "pendientesFirma", id));
@@ -2108,6 +2137,7 @@ async function registrarCertificacionVigente(id, registro) {
       throw new Error("Los datos del envío cambiaron. Abra nuevamente el documento desde la bandeja.");
     }
     transaccion.set(doc(db, "certificaciones", id), registro);
+    transaccion.set(doc(db, "certificacionesPublicas", id), crearRegistroPublico(registro));
   });
 }
 
@@ -2362,6 +2392,8 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
       throw new Error("El archivo seleccionado no es un PDF válido o está dañado.");
     }
 
+    const validacionFirmaEstructural = validarFirmaEstructural(bytesFirmados);
+
     const identidadEsperada = pendienteFirmaActual.id;
     let identidadConservada = false;
     if (window.pdfjsLib) {
@@ -2436,6 +2468,7 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
       selloArchivo: pendienteFirmaActual.selloArchivo || "",
       firmaDigital: true,
       firmaDigitalTipo: "FIRMA ONPE",
+      validacionFirmaEstructural,
       firmadoEnSAMICERT: serverTimestamp(),
       creadoEn: serverTimestamp(),
       version: 14,
@@ -2478,7 +2511,9 @@ btnRegistrarFirmado?.addEventListener("click", async () => {
     );
   } catch (err) {
     console.error(err);
-    alert("No se pudo culminar la firma: " + (err.message || ""));
+    alert(err.code === "permission-denied"
+      ? "Firebase rechazó el registro. Publique el archivo firestore.rules incluido en esta actualización y confirme que ingresó como Mesa de Partes. Si se guardó un PDF local, todavía no significa que la certificación esté registrada. Puede reintentar con el mismo PDF firmado."
+      : "No se pudo culminar la firma: " + (err.message || ""));
     btnRegistrarFirmado.disabled = false;
   }
 });

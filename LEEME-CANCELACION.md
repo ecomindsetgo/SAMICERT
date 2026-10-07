@@ -22,8 +22,3 @@ La acción elimina el envío de las bandejas, no borra físicamente el registro 
 - 11 pruebas locales con Firestore simulado: cancelación propia, rechazo de otra cuenta, otro propietario, cancelado, inexistente o certificado; confirmación rechazada; mensaje de éxito; error de permisos y reintento; registro final permitido o bloqueado según el estado.
 - No se accedió al proyecto Firebase real ni se publicaron cambios en el sitio.
 
-## Incompatibilidad adicional del ZIP original
-
-Las reglas compartidas exigen `validacionFirmaEstructural == true` al crear la certificación definitiva. El flujo original adjunto no implementa esa validación ni genera ese campo; por tanto, ese paso puede ser rechazado independientemente de esta corrección. No se añadió un valor `true` artificial ni se eliminó la exigencia de las reglas.
-
-Además, el verificador público original consulta `certificaciones`, mientras estas reglas reservan la lectura pública para `certificacionesPublicas`. Este paquete corrige la cancelación solicitada; no constituye una adaptación completa del flujo de firma y verificación a esas reglas. Estas observaciones se basan en el ZIP adjunto y las reglas compartidas, no en una prueba del sitio publicado.
